@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { SalesOrder, SalesOrderItem, Customer, UserRole } from '../types';
 import { Save, User, MapPin, Mail, Phone, FileText, Upload, Plus, Trash2, ShoppingCart, Package, Info, AlertCircle, CheckCircle, MessageCircle, ArrowRight, Search, Copy, Share2, X } from 'lucide-react';
@@ -20,7 +21,10 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
   const [city, setCity] = useState('');
   const [mapLink, setMapLink] = useState('');
   const [poNumber, setPoNumber] = useState('');
-  const [poFile, setPoFile] = useState<string | null>(null);
+  
+  // File Upload State
+  const [poFileName, setPoFileName] = useState('');
+  const [poFileData, setPoFileData] = useState<string | null>(null);
   
   // Admin on-behalf state
   const [selectedSalesPerson, setSelectedSalesPerson] = useState(salesPersonName);
@@ -45,6 +49,24 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
     setCity(c.city);
     setMapLink(c.mapLink);
     setShowCustomerResults(false);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // 500KB Limit check
+      if (file.size > 500 * 1024) {
+        alert("File size too large. Please upload a file smaller than 500KB.");
+        return;
+      }
+
+      setPoFileName(file.name);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPoFileData(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   // --- Product Selection State ---
@@ -131,8 +153,6 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
     
     // Reset selection
     setQuantityKg('');
-    // Price often stays same for customer, but reset it if preferred. Let's keep it for speed or reset? 
-    // Resetting usually safer.
     setPricePerKg('');
   };
 
@@ -158,7 +178,8 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
       city,
       mapLink,
       poNumber: poNumber || 'N/A',
-      poFileName: poFile ? 'PO_Document.pdf' : undefined,
+      poFileName: poFileName || undefined,
+      poFileData: poFileData || undefined,
       items: cartItems,
       totalWeightKg: cartItems.reduce((sum, item) => sum + item.calculatedWeightKg, 0),
       subTotal: subTotal,
@@ -169,7 +190,7 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
 
     // Auto-save customer if new or updated
     const customerRecord: Customer = {
-      id: crypto.randomUUID(), // Logic in service handles dedup by mobile
+      id: crypto.randomUUID(), 
       name: customerName,
       mobile: mobile,
       email: email,
@@ -189,7 +210,7 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
     text += `Mobile: ${order.mobileNumber}\n`;
     text += `Sales Person: ${order.salesPerson}\n`;
     text += `City: ${order.city}\n`;
-    if(order.mapLink) text += `Delivery Location: ${order.mapLink}\n`;
+    if(order.mapLink) text += `📍 ${order.mapLink}\n`;
     text += `PO No: ${order.poNumber}\n`;
     if(order.poFileName) text += `PO File: ${order.poFileName} (See Attachment)\n`;
     
@@ -283,7 +304,7 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
             
             <div className="flex gap-2">
                <button 
-                  onClick={() => setSubmittedOrder(null)} // Hack to close popup but keep SalesEntry logic if needed, or better:
+                  onClick={() => setSubmittedOrder(null)} 
                   className="hidden" 
                />
                <POPreview order={submittedOrder} onClose={onCancel} isDialog={true} />
@@ -402,13 +423,14 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
                   <input 
                     type="file" 
                     accept=".pdf,.jpg,.png" 
-                    onChange={(e) => setPoFile(e.target.value)} 
+                    onChange={handleFileChange} 
                     className="absolute inset-0 opacity-0 cursor-pointer"
                   />
                   <Upload className="mx-auto text-gray-400 mb-2" size={24} />
                   <p className="text-xs text-gray-500">
-                    {poFile ? 'File Selected (Simulated)' : 'Click to upload PO (PDF/Image)'}
+                    {poFileName ? `Selected: ${poFileName}` : 'Click to upload PO (PDF/Image)'}
                   </p>
+                  <p className="text-[10px] text-gray-400 mt-1">Max 500KB</p>
                 </div>
              </div>
           </div>

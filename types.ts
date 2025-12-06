@@ -1,3 +1,4 @@
+
 export interface ProductionRecord {
   id: string;
   date: string;
@@ -43,7 +44,8 @@ export interface SalesOrder {
   
   // PO Details
   poNumber: string;
-  poFileName?: string; // Simulation of uploaded file
+  poFileName?: string; 
+  poFileData?: string; // Base64 Data URL for the file
   
   // Order Data
   items: SalesOrderItem[];

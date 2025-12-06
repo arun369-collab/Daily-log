@@ -1,6 +1,7 @@
+
 import React, { useState } from 'react';
 import { SalesOrder } from '../types';
-import { ShoppingBag, MapPin, FileText, CheckCircle, Clock, Eye, X, MessageCircle, Copy, Share2, Printer } from 'lucide-react';
+import { ShoppingBag, MapPin, FileText, CheckCircle, Clock, Eye, X, MessageCircle, Copy, Share2, Printer, ExternalLink } from 'lucide-react';
 import { POPreview } from './POPreview';
 
 interface SalesDashboardProps {
@@ -18,7 +19,7 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders }) => {
     text += `Mobile: ${order.mobileNumber}\n`;
     text += `Sales Person: ${order.salesPerson}\n`;
     text += `City: ${order.city}\n`;
-    if(order.mapLink) text += `Delivery Location: ${order.mapLink}\n`;
+    if(order.mapLink) text += `📍 ${order.mapLink}\n`;
     text += `PO No: ${order.poNumber}\n`;
     if(order.poFileName) text += `PO File: ${order.poFileName} (See Attachment)\n`;
     
@@ -57,6 +58,18 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders }) => {
       }
     } else {
       handleCopy(order);
+    }
+  };
+
+  const handleViewPOFile = (order: SalesOrder) => {
+    if (!order.poFileData) return;
+    
+    const win = window.open();
+    if (win) {
+      win.document.write(
+        `<iframe src="${order.poFileData}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`
+      );
+      win.document.title = `PO View - ${order.poNumber}`;
     }
   };
 
@@ -244,7 +257,15 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders }) => {
                  </table>
                </div>
                
-               <div className="flex gap-3 mb-4 justify-end">
+               <div className="flex gap-3 mb-4 justify-end flex-wrap">
+                   {selectedOrder.poFileData && (
+                      <button 
+                         onClick={() => handleViewPOFile(selectedOrder)}
+                         className="px-4 py-2 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-lg font-medium flex items-center gap-2 transition-colors text-sm"
+                       >
+                         <ExternalLink size={16} /> View Uploaded PO
+                       </button>
+                   )}
                    <button 
                      onClick={() => setShowPOPreview(true)}
                      className="px-4 py-2 bg-gray-800 hover:bg-black text-white rounded-lg font-medium flex items-center gap-2 transition-colors text-sm"
