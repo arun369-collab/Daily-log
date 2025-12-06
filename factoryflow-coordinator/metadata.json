@@ -1,0 +1,5 @@
+{
+  "name": "FactoryFlow Coordinator",
+  "description": "A comprehensive factory production tracking dashboard. Collects daily floor data, visualizes production metrics, and uses Gemini AI to generate daily operational summaries and insights.",
+  "requestFramePermissions": []
+}
