@@ -1,9 +1,23 @@
 import { GoogleGenAI } from "@google/genai";
 import { ProductionRecord } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Helper to get the AI client safely
+const getAiClient = () => {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    console.warn("Gemini API Key is missing. AI features will be disabled.");
+    return null;
+  }
+  return new GoogleGenAI({ apiKey });
+};
 
 export const generateProductionInsight = async (records: ProductionRecord[]): Promise<string> => {
+  const ai = getAiClient();
+  
+  if (!ai) {
+    return "AI Service Unavailable: API Key is missing. Please add API_KEY to your environment variables.";
+  }
+
   if (records.length === 0) {
     return "No ledger data available to analyze.";
   }
@@ -50,6 +64,6 @@ export const generateProductionInsight = async (records: ProductionRecord[]): Pr
     return response.text || "Could not generate summary.";
   } catch (error) {
     console.error("Gemini API Error:", error);
-    return "Error generating AI insight. Please try again later.";
+    return "Error generating AI insight. Please check your API usage or key.";
   }
 };
