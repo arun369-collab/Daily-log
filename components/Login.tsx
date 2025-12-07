@@ -18,7 +18,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     const user = username.toLowerCase().trim();
     const pass = password.trim();
 
-    if (user === 'admin' && pass === 'admin123') {
+    if (user === 'universe' && pass === 'universe') {
       onLogin('admin');
     } else if (user === 'yadav' && pass === 'yadav') {
       onLogin('yadav');
