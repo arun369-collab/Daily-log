@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, 
@@ -37,7 +38,10 @@ function App() {
   // Data States
   const [records, setRecords] = useState<ProductionRecord[]>([]);
   const [editingRecord, setEditingRecord] = useState<ProductionRecord | null>(null);
+  
+  // Sales States
   const [salesOrders, setSalesOrders] = useState<SalesOrder[]>([]);
+  const [editingOrder, setEditingOrder] = useState<SalesOrder | null>(null);
 
   useEffect(() => {
     // Check session storage for existing auth
@@ -110,8 +114,17 @@ function App() {
   const handleSaveOrder = (order: SalesOrder) => {
     const updated = saveSalesOrder(order);
     setSalesOrders(updated);
-    // Note: We do NOT switch view here automatically anymore. 
-    // SalesEntry component handles the UI flow to show "Success" message first.
+    // Note: We stay on SalesEntry to show success popup
+    setEditingOrder(null);
+  };
+
+  const handleEditOrder = (order: SalesOrder) => {
+    setEditingOrder(order);
+    setView('sales_entry');
+  };
+
+  const refreshOrders = () => {
+    setSalesOrders(getSalesOrders());
   };
 
   const NavItem = ({ target, icon: Icon, label }: { target: ViewState, icon: React.ElementType, label: string }) => (
@@ -119,6 +132,7 @@ function App() {
       onClick={() => {
         setView(target);
         setEditingRecord(null);
+        setEditingOrder(null);
       }}
       className={`flex items-center gap-3 px-4 py-3 rounded-lg w-full transition-all ${
         view === target 
@@ -136,6 +150,7 @@ function App() {
       onClick={() => {
         setView(target);
         setEditingRecord(null);
+        setEditingOrder(null);
       }}
       className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${
         view === target ? 'text-blue-600' : 'text-gray-400'
@@ -257,7 +272,7 @@ function App() {
               {view === 'history' && 'Ledger History'}
               {view === 'settings' && 'App Configuration'}
               {view === 'sales_dashboard' && 'Sales Dashboard'}
-              {view === 'sales_entry' && 'New Sales Order'}
+              {view === 'sales_entry' && (editingOrder ? 'Edit Order' : 'New Sales Order')}
               {view === 'customers' && 'Customer Database'}
             </h1>
             <p className="text-gray-500 text-sm mt-1 print:hidden hidden md:block">
@@ -291,15 +306,22 @@ function App() {
           {canAccess('settings') && view === 'settings' && <Settings onLogout={handleLogout} />}
 
           {canAccess('sales_dashboard') && view === 'sales_dashboard' && (
-            <SalesDashboard orders={salesOrders} />
+            <SalesDashboard 
+              orders={salesOrders} 
+              onEditOrder={handleEditOrder}
+              userRole={userRole}
+              onRefreshData={refreshOrders}
+            />
           )}
 
           {canAccess('sales_entry') && view === 'sales_entry' && (
              <SalesEntry 
+               key={editingOrder ? editingOrder.id : 'new-order'}
                onSave={handleSaveOrder} 
-               onCancel={() => setView('sales_dashboard')} 
+               onCancel={() => { setView('sales_dashboard'); setEditingOrder(null); }} 
                salesPersonName={userRole === 'sales' ? 'Asim' : 'Admin'}
                userRole={userRole}
+               initialOrder={editingOrder}
              />
           )}
 

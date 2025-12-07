@@ -1,17 +1,64 @@
 
-import React, { useState } from 'react';
-import { SalesOrder } from '../types';
-import { ShoppingBag, MapPin, FileText, CheckCircle, Clock, Eye, X, MessageCircle, Copy, Share2, Printer, ExternalLink } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { SalesOrder, UserRole } from '../types';
+import { ShoppingBag, MapPin, FileText, CheckCircle, Clock, Eye, X, MessageCircle, Copy, Share2, Printer, ExternalLink, Pencil, Truck, Package, RefreshCw } from 'lucide-react';
 import { POPreview } from './POPreview';
+import { saveSalesOrder } from '../services/storageService';
 
 interface SalesDashboardProps {
   orders: SalesOrder[];
+  onEditOrder: (order: SalesOrder) => void;
+  userRole: UserRole;
+  onRefreshData: () => void; // Callback to force reload from parent
 }
 
-export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders }) => {
+export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, onEditOrder, userRole, onRefreshData }) => {
   const [selectedOrder, setSelectedOrder] = useState<SalesOrder | null>(null);
   const [showPOPreview, setShowPOPreview] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState(false);
+  
+  // Bulk selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Filter out delivered orders to reduce clutter? Or keep all. 
+  // Let's sort by date descending.
+  const sortedOrders = useMemo(() => {
+    return [...orders].sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime());
+  }, [orders]);
+
+  const toggleSelection = (id: string) => {
+    const newSet = new Set(selectedIds);
+    if (newSet.has(id)) {
+      newSet.delete(id);
+    } else {
+      newSet.add(id);
+    }
+    setSelectedIds(newSet);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === sortedOrders.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(sortedOrders.map(o => o.id)));
+    }
+  };
+
+  const handleBulkStatusUpdate = (newStatus: SalesOrder['status']) => {
+    if (selectedIds.size === 0) return;
+    
+    // Update all selected orders
+    sortedOrders.forEach(order => {
+      if (selectedIds.has(order.id)) {
+        const updated = { ...order, status: newStatus };
+        saveSalesOrder(updated);
+      }
+    });
+
+    onRefreshData();
+    setSelectedIds(new Set()); // Clear selection
+    alert(`Updated ${selectedIds.size} orders to ${newStatus}`);
+  };
 
   const generateShareText = (order: SalesOrder) => {
     let text = `*Sales Order Details* 📦\n`;
@@ -97,17 +144,64 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders }) => {
         </div>
       </div>
 
+      {/* Bulk Action Bar (Visible when selections exist) */}
+      {selectedIds.size > 0 && userRole === 'admin' && (
+        <div className="bg-indigo-900 text-white p-4 rounded-xl shadow-md flex justify-between items-center animate-fadeIn">
+          <div className="font-bold flex items-center gap-2">
+            <CheckCircle className="text-green-400" />
+            {selectedIds.size} Orders Selected
+          </div>
+          <div className="flex gap-2">
+            <button 
+              onClick={() => handleBulkStatusUpdate('Processing')}
+              className="px-4 py-2 bg-indigo-700 hover:bg-indigo-600 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+            >
+              <Package size={16} /> Mark Processing
+            </button>
+             <button 
+              onClick={() => handleBulkStatusUpdate('Dispatched')}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+            >
+              <Truck size={16} /> Dispatch
+            </button>
+            <button 
+              onClick={() => handleBulkStatusUpdate('Delivered')}
+              className="px-4 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+            >
+              <CheckCircle size={16} /> Delivered
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
           <h3 className="font-bold text-gray-700 flex items-center gap-2">
             <ShoppingBag size={18} /> Recent Orders
           </h3>
+          <button 
+            onClick={onRefreshData}
+            className="text-gray-400 hover:text-indigo-600 transition-colors"
+            title="Refresh List"
+          >
+            <RefreshCw size={18} />
+          </button>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="bg-gray-50 text-gray-500 border-b border-gray-100">
               <tr>
+                {userRole === 'admin' && (
+                  <th className="px-4 py-3 w-10">
+                    <input 
+                      type="checkbox" 
+                      onChange={toggleSelectAll} 
+                      checked={selectedIds.size > 0 && selectedIds.size === sortedOrders.length}
+                      className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" 
+                    />
+                  </th>
+                )}
                 <th className="px-6 py-3 font-medium">Date</th>
                 <th className="px-6 py-3 font-medium">Customer</th>
                 <th className="px-6 py-3 font-medium">PO Details</th>
@@ -118,8 +212,18 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders }) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {orders.map((order) => (
-                <tr key={order.id} className="hover:bg-gray-50">
+              {sortedOrders.map((order) => (
+                <tr key={order.id} className={`hover:bg-gray-50 ${selectedIds.has(order.id) ? 'bg-indigo-50/50' : ''}`}>
+                  {userRole === 'admin' && (
+                    <td className="px-4 py-4 text-center">
+                       <input 
+                        type="checkbox" 
+                        checked={selectedIds.has(order.id)} 
+                        onChange={() => toggleSelection(order.id)}
+                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" 
+                      />
+                    </td>
+                  )}
                   <td className="px-6 py-4 text-gray-600 whitespace-nowrap">{order.orderDate}</td>
                   <td className="px-6 py-4">
                     <div className="font-bold text-gray-900">{order.customerName}</div>
@@ -154,26 +258,44 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders }) => {
                   </td>
                   <td className="px-6 py-4 text-center">
                     <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      order.status === 'Pending' ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'
+                      order.status === 'Pending' ? 'bg-amber-100 text-amber-800' : 
+                      order.status === 'Processing' ? 'bg-blue-100 text-blue-800' : 
+                      order.status === 'Dispatched' ? 'bg-purple-100 text-purple-800' : 
+                      'bg-green-100 text-green-800'
                     }`}>
-                      {order.status === 'Pending' ? <Clock size={12} /> : <CheckCircle size={12} />}
+                      {order.status === 'Pending' && <Clock size={12} />}
+                      {order.status === 'Processing' && <Package size={12} />}
+                      {order.status === 'Dispatched' && <Truck size={12} />}
+                      {order.status === 'Delivered' && <CheckCircle size={12} />}
                       {order.status}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-center">
-                    <button 
-                      onClick={() => setSelectedOrder(order)}
-                      className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors"
-                      title="View Details"
-                    >
-                      <Eye size={18} />
-                    </button>
+                    <div className="flex justify-center gap-2">
+                       {/* Edit Button - Admin Only (or if pending) */}
+                       {userRole === 'admin' && (
+                         <button 
+                           onClick={() => onEditOrder(order)}
+                           className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
+                           title="Edit Order"
+                         >
+                           <Pencil size={18} />
+                         </button>
+                       )}
+                       <button 
+                        onClick={() => setSelectedOrder(order)}
+                        className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors"
+                        title="View Details"
+                      >
+                        <Eye size={18} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
               {orders.length === 0 && (
                 <tr>
-                   <td colSpan={7} className="px-6 py-12 text-center text-gray-400">
+                   <td colSpan={userRole === 'admin' ? 8 : 7} className="px-6 py-12 text-center text-gray-400">
                      No orders found.
                    </td>
                 </tr>

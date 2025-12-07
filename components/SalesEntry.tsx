@@ -11,9 +11,10 @@ interface SalesEntryProps {
   onCancel: () => void;
   salesPersonName: string;
   userRole: UserRole;
+  initialOrder?: SalesOrder | null;
 }
 
-export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesPersonName, userRole }) => {
+export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesPersonName, userRole, initialOrder }) => {
   // --- Customer & PO State ---
   const [customerName, setCustomerName] = useState('');
   const [mobile, setMobile] = useState('');
@@ -33,9 +34,45 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [showCustomerResults, setShowCustomerResults] = useState(false);
 
+  // --- Product Selection State ---
+  const [selectedFamily, setSelectedFamily] = useState<string>('');
+  const [selectedType, setSelectedType] = useState<string>('');
+  const [selectedSize, setSelectedSize] = useState<string>('');
+  const [quantityKg, setQuantityKg] = useState<number | ''>('');
+  const [pricePerKg, setPricePerKg] = useState<number | ''>(''); 
+  
+  // --- Active Product Def ---
+  const [activeDef, setActiveDef] = useState<ProductDefinition | undefined>(undefined);
+  const [ctnWeight, setCtnWeight] = useState<number>(0);
+
+  // --- Cart State ---
+  const [cartItems, setCartItems] = useState<SalesOrderItem[]>([]);
+
+  // --- Submission State ---
+  const [submittedOrder, setSubmittedOrder] = useState<SalesOrder | null>(null);
+  const [copyFeedback, setCopyFeedback] = useState(false);
+
   useEffect(() => {
     setCustomers(getCustomers());
   }, []);
+
+  // Hydrate form if editing
+  useEffect(() => {
+    if (initialOrder) {
+      setCustomerName(initialOrder.customerName);
+      setMobile(initialOrder.mobileNumber);
+      setEmail(initialOrder.email);
+      setCity(initialOrder.city);
+      setMapLink(initialOrder.mapLink);
+      setPoNumber(initialOrder.poNumber);
+      setPoFileName(initialOrder.poFileName || '');
+      setPoFileData(initialOrder.poFileData || null);
+      setCartItems(initialOrder.items);
+      if (userRole === 'admin') {
+        setSelectedSalesPerson(initialOrder.salesPerson);
+      }
+    }
+  }, [initialOrder, userRole]);
 
   const filteredCustomers = useMemo(() => {
     if (!customerName || customerName.length < 2) return [];
@@ -69,24 +106,6 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
     }
   };
 
-  // --- Product Selection State ---
-  const [selectedFamily, setSelectedFamily] = useState<string>('');
-  const [selectedType, setSelectedType] = useState<string>('');
-  const [selectedSize, setSelectedSize] = useState<string>('');
-  const [quantityKg, setQuantityKg] = useState<number | ''>('');
-  const [pricePerKg, setPricePerKg] = useState<number | ''>(''); // New Price Input
-  
-  // --- Active Product Def ---
-  const [activeDef, setActiveDef] = useState<ProductDefinition | undefined>(undefined);
-  const [ctnWeight, setCtnWeight] = useState<number>(0);
-
-  // --- Cart State ---
-  const [cartItems, setCartItems] = useState<SalesOrderItem[]>([]);
-
-  // --- Submission State ---
-  const [submittedOrder, setSubmittedOrder] = useState<SalesOrder | null>(null);
-  const [copyFeedback, setCopyFeedback] = useState(false);
-
   // Update Active Definition
   useEffect(() => {
     if (selectedFamily && selectedType) {
@@ -112,10 +131,6 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
   // 6013 Batch Logic (Weight based)
   const batchHint = useMemo(() => {
     if (selectedFamily === '6013' && quantityKg && activeDef && ctnWeight) {
-       // 6013 requires multiple of 16 cartons.
-       // 16 Cartons weight = 16 * ctnWeight
-       // Typically 6013 ctnWeight is 16kg. So 16 * 16 = 256kg batch.
-       
        const batchWeight = 16 * ctnWeight; 
        const enteredWeight = Number(quantityKg);
        
@@ -169,8 +184,8 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
     if (cartItems.length === 0 || !customerName) return;
 
     const newOrder: SalesOrder = {
-      id: crypto.randomUUID(),
-      orderDate: new Date().toISOString().split('T')[0],
+      id: initialOrder ? initialOrder.id : crypto.randomUUID(),
+      orderDate: initialOrder ? initialOrder.orderDate : new Date().toISOString().split('T')[0],
       salesPerson: userRole === 'admin' ? selectedSalesPerson : salesPersonName,
       customerName,
       mobileNumber: mobile,
@@ -185,7 +200,7 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
       subTotal: subTotal,
       vatAmount: vatAmount,
       grandTotal: grandTotal,
-      status: 'Pending'
+      status: initialOrder ? initialOrder.status : 'Pending'
     };
 
     // Auto-save customer if new or updated
@@ -220,7 +235,6 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
     });
     
     text += `\n*Total Weight:* ${order.totalWeightKg.toLocaleString()} Kg`;
-    // NOTE: Price is intentionally excluded from this text
     return text;
   };
 
@@ -267,8 +281,8 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
             <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
               <CheckCircle className="text-green-600 w-10 h-10" />
             </div>
-            <h2 className="text-2xl font-bold text-white">Order Placed!</h2>
-            <p className="text-green-100">The order has been successfully recorded.</p>
+            <h2 className="text-2xl font-bold text-white">{initialOrder ? 'Order Updated!' : 'Order Placed!'}</h2>
+            <p className="text-green-100">The order has been successfully saved.</p>
           </div>
 
           <div className="p-6 space-y-4">
@@ -327,9 +341,9 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
       <div className="bg-indigo-600 px-6 py-4 flex justify-between items-center">
         <div>
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <ShoppingCart className="text-indigo-200" /> New Sales Order
+            <ShoppingCart className="text-indigo-200" /> {initialOrder ? 'Edit Sales Order' : 'New Sales Order'}
           </h2>
-          <p className="text-indigo-100 text-sm">Enter customer and product details</p>
+          <p className="text-indigo-100 text-sm">{initialOrder ? 'Modify order details and items' : 'Enter customer and product details'}</p>
         </div>
         {userRole === 'admin' && (
            <div className="bg-indigo-700 px-3 py-1 rounded-lg border border-indigo-500">
@@ -440,7 +454,7 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
         <div className="space-y-6 flex flex-col h-full">
            <div className="bg-white p-4 rounded-xl border-2 border-indigo-100 shadow-sm">
              <h3 className="font-bold text-indigo-900 flex items-center gap-2 mb-4">
-               <Package size={18} /> Add Items
+               <Package size={18} /> {initialOrder ? 'Add/Modify Items' : 'Add Items'}
              </h3>
              
              <div className="grid grid-cols-2 gap-3 mb-3">
@@ -584,7 +598,7 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
                     disabled={cartItems.length === 0 || !customerName}
                     className="flex-1 bg-indigo-600 text-white py-3 rounded-lg font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
-                    Place Order <ArrowRight size={18} />
+                    {initialOrder ? 'Update Order' : 'Place Order'} <ArrowRight size={18} />
                   </button>
                 </div>
              </div>

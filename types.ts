@@ -56,7 +56,7 @@ export interface SalesOrder {
   vatAmount: number; // 15%
   grandTotal: number;
   
-  status: 'Pending' | 'Dispatched' | 'Delivered';
+  status: 'Pending' | 'Processing' | 'Dispatched' | 'Delivered';
 }
 
 export interface Customer {

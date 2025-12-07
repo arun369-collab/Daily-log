@@ -1,3 +1,4 @@
+
 import { ProductionRecord, SalesOrder, Customer } from '../types';
 
 const STORAGE_KEY = 'factory_flow_data';
@@ -59,7 +60,19 @@ export const getSalesOrders = (): SalesOrder[] => {
 
 export const saveSalesOrder = (order: SalesOrder): SalesOrder[] => {
   const current = getSalesOrders();
-  const updated = [order, ...current]; // Add to top
+  const index = current.findIndex(o => o.id === order.id);
+  
+  let updated: SalesOrder[];
+
+  if (index >= 0) {
+    // Update existing order
+    updated = [...current];
+    updated[index] = order;
+  } else {
+    // Add new order to top
+    updated = [order, ...current];
+  }
+
   localStorage.setItem(ORDERS_KEY, JSON.stringify(updated));
   return updated;
 };
