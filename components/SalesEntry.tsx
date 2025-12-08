@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { SalesOrder, SalesOrderItem, Customer, UserRole } from '../types';
-import { Save, User, MapPin, Mail, Phone, FileText, Upload, Plus, Trash2, ShoppingCart, Package, Info, AlertCircle, CheckCircle, MessageCircle, ArrowRight, Search, Copy, Share2, X } from 'lucide-react';
+import { Save, User, MapPin, Mail, Phone, FileText, Upload, Plus, Trash2, ShoppingCart, Package, Info, AlertCircle, CheckCircle, MessageCircle, ArrowRight, Search, Copy, Share2, X, Briefcase } from 'lucide-react';
 import { getFamilies, getTypesForFamily, getProductDef, ProductDefinition } from '../data/products';
 import { getCustomers, saveCustomer } from '../services/storageService';
 import { POPreview } from './POPreview';
@@ -13,6 +13,15 @@ interface SalesEntryProps {
   userRole: UserRole;
   initialOrder?: SalesOrder | null;
 }
+
+const SALES_PEOPLE_LIST = [
+  "Admin",
+  "Asim",
+  "Arshad Baig",
+  "AHMED SALEM",
+  "tharwat abbas",
+  "AHMED FAHMY"
+];
 
 export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesPersonName, userRole, initialOrder }) => {
   // --- Customer & PO State ---
@@ -29,6 +38,7 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
   
   // Admin on-behalf state
   const [selectedSalesPerson, setSelectedSalesPerson] = useState(salesPersonName);
+  const [isCustomSalesPerson, setIsCustomSalesPerson] = useState(false);
 
   // Customer Lookup
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -68,11 +78,21 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
       setPoFileName(initialOrder.poFileName || '');
       setPoFileData(initialOrder.poFileData || null);
       setCartItems(initialOrder.items);
+      
+      const sp = initialOrder.salesPerson;
+      setSelectedSalesPerson(sp);
+      
+      // If admin is editing, check if custom name is needed
       if (userRole === 'admin') {
-        setSelectedSalesPerson(initialOrder.salesPerson);
+        if (!SALES_PEOPLE_LIST.includes(sp)) {
+          setIsCustomSalesPerson(true);
+        }
       }
+    } else {
+      // Reset to default sales person when starting new
+      setSelectedSalesPerson(salesPersonName);
     }
-  }, [initialOrder, userRole]);
+  }, [initialOrder, userRole, salesPersonName]);
 
   const filteredCustomers = useMemo(() => {
     if (!customerName || customerName.length < 2) return [];
@@ -183,10 +203,14 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
   const handleSubmit = () => {
     if (cartItems.length === 0 || !customerName) return;
 
+    // Determine final sales person name
+    // If admin, use selection. If sales, use their login name.
+    const finalSalesPerson = userRole === 'admin' ? selectedSalesPerson : salesPersonName;
+
     const newOrder: SalesOrder = {
       id: initialOrder ? initialOrder.id : crypto.randomUUID(),
       orderDate: initialOrder ? initialOrder.orderDate : new Date().toISOString().split('T')[0],
-      salesPerson: userRole === 'admin' ? selectedSalesPerson : salesPersonName,
+      salesPerson: finalSalesPerson,
       customerName,
       mobileNumber: mobile,
       email,
@@ -345,19 +369,12 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
           </h2>
           <p className="text-indigo-100 text-sm">{initialOrder ? 'Modify order details and items' : 'Enter customer and product details'}</p>
         </div>
-        {userRole === 'admin' && (
-           <div className="bg-indigo-700 px-3 py-1 rounded-lg border border-indigo-500">
-             <label className="text-xs text-indigo-300 block">Sales Person</label>
-             <select 
-               value={selectedSalesPerson}
-               onChange={(e) => setSelectedSalesPerson(e.target.value)}
-               className="bg-transparent text-white font-bold outline-none text-sm"
-             >
-               <option value="Admin">Admin</option>
-               <option value="Asim">Asim</option>
-             </select>
-           </div>
-        )}
+        {/* Sales Person Display (Read Only in Header) */}
+        <div className="hidden md:block">
+           <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-indigo-700 text-indigo-100 text-xs font-medium border border-indigo-500">
+             <Briefcase size={12} /> {userRole === 'admin' ? selectedSalesPerson : salesPersonName}
+           </span>
+        </div>
       </div>
 
       <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -368,6 +385,50 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
              <h3 className="font-bold text-gray-700 flex items-center gap-2 mb-4">
                <User size={18} /> Customer Details
              </h3>
+
+             {/* ADMIN: Sales Person Selection (Moved to body for better visibility) */}
+             {userRole === 'admin' && (
+                <div className="mb-6 bg-indigo-50 p-3 rounded-lg border border-indigo-100">
+                  <label className="block text-xs font-bold text-indigo-600 uppercase mb-2">Order On Behalf Of:</label>
+                  {isCustomSalesPerson ? (
+                    <div className="flex items-center gap-2">
+                        <input 
+                          type="text" 
+                          value={selectedSalesPerson}
+                          onChange={(e) => setSelectedSalesPerson(e.target.value)}
+                          className="w-full px-3 py-2 border border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                          placeholder="Enter Salesperson Name"
+                          autoFocus
+                        />
+                        <button 
+                          onClick={() => { setIsCustomSalesPerson(false); setSelectedSalesPerson('Admin'); }}
+                          className="p-2 text-gray-500 hover:text-red-500 bg-white rounded border border-gray-200"
+                          title="Back to list"
+                        >
+                          <X size={16} />
+                        </button>
+                    </div>
+                  ) : (
+                    <select 
+                      value={selectedSalesPerson}
+                      onChange={(e) => {
+                        if (e.target.value === 'Other') {
+                          setIsCustomSalesPerson(true);
+                          setSelectedSalesPerson('');
+                        } else {
+                          setSelectedSalesPerson(e.target.value);
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-indigo-900 font-medium"
+                    >
+                      {SALES_PEOPLE_LIST.map(p => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
+                      <option value="Other" className="font-bold text-indigo-600">+ Other / Add New...</option>
+                    </select>
+                  )}
+                </div>
+             )}
              
              {/* Customer Lookup */}
              <div className="relative mb-4">

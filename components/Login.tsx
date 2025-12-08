@@ -1,9 +1,10 @@
+
 import React, { useState } from 'react';
 import { Lock, User, Factory, ArrowRight } from 'lucide-react';
 import { UserRole } from '../types';
 
 interface LoginProps {
-  onLogin: (role: UserRole) => void;
+  onLogin: (role: UserRole, username?: string) => void;
 }
 
 export const Login: React.FC<LoginProps> = ({ onLogin }) => {
@@ -19,12 +20,19 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     const pass = password.trim();
 
     if (user === 'universe' && pass === 'universe') {
-      onLogin('admin');
+      onLogin('admin', 'Admin');
     } else if (user === 'yadav' && pass === 'yadav') {
-      onLogin('yadav');
+      onLogin('yadav', 'Yadav');
     } else if (user === 'asim' && pass === 'asim') {
-      onLogin('sales');
-    } else {
+      onLogin('sales', 'Asim');
+    } 
+    // Additional Sales Staff (Generic password '1234')
+    else if (['arshad', 'ahmed', 'tharwat'].includes(user) && pass === '1234') {
+       // Convert input 'arshad' -> 'Arshad' for display
+       const displayName = username.charAt(0).toUpperCase() + username.slice(1);
+       onLogin('sales', displayName);
+    }
+    else {
       setError('Invalid username or password');
     }
   };

@@ -33,6 +33,7 @@ import { syncToGoogleSheet } from './services/syncService';
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userRole, setUserRole] = useState<UserRole>('admin');
+  const [username, setUsername] = useState<string>('Admin'); // Track actual name (e.g. Asim)
   const [view, setView] = useState<ViewState>('dashboard');
   
   // Data States
@@ -47,11 +48,14 @@ function App() {
     // Check session storage for existing auth
     const storedAuth = sessionStorage.getItem('factory_flow_auth');
     const storedRole = sessionStorage.getItem('factory_flow_role') as UserRole;
+    const storedUser = sessionStorage.getItem('factory_flow_username');
     
     if (storedAuth === 'true') {
       setIsAuthenticated(true);
       if (storedRole) {
         setUserRole(storedRole);
+        if (storedUser) setUsername(storedUser);
+
         // Default view logic on reload
         if (storedRole === 'yadav') {
           setView('entry');
@@ -65,10 +69,12 @@ function App() {
     setSalesOrders(getSalesOrders());
   }, []);
 
-  const handleLogin = (role: UserRole) => {
+  const handleLogin = (role: UserRole, name: string = 'User') => {
     sessionStorage.setItem('factory_flow_auth', 'true');
     sessionStorage.setItem('factory_flow_role', role);
+    sessionStorage.setItem('factory_flow_username', name);
     setUserRole(role);
+    setUsername(name);
     setIsAuthenticated(true);
     
     // Default view logic on login
@@ -84,9 +90,11 @@ function App() {
   const handleLogout = () => {
     sessionStorage.removeItem('factory_flow_auth');
     sessionStorage.removeItem('factory_flow_role');
+    sessionStorage.removeItem('factory_flow_username');
     setIsAuthenticated(false);
     setView('dashboard');
     setUserRole('admin'); // Reset to default
+    setUsername('Admin');
   };
 
   // --- Production Record Handlers ---
@@ -242,7 +250,7 @@ function App() {
 
         <div className="pt-4 mt-auto border-t border-gray-100 space-y-2">
            <div className="px-4 py-2 mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-             User: {userRole}
+             User: {username}
            </div>
            
            {canAccess('settings') && (
@@ -276,7 +284,7 @@ function App() {
               {view === 'customers' && 'Customer Database'}
             </h1>
             <p className="text-gray-500 text-sm mt-1 print:hidden hidden md:block">
-              Welcome, <span className="capitalize font-semibold">{userRole}</span>.
+              Welcome, <span className="capitalize font-semibold">{username}</span>.
             </p>
           </div>
           
@@ -319,7 +327,7 @@ function App() {
                key={editingOrder ? editingOrder.id : 'new-order'}
                onSave={handleSaveOrder} 
                onCancel={() => { setView('sales_dashboard'); setEditingOrder(null); }} 
-               salesPersonName={userRole === 'sales' ? 'Asim' : 'Admin'}
+               salesPersonName={username}
                userRole={userRole}
                initialOrder={editingOrder}
              />
