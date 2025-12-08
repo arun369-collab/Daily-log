@@ -316,6 +316,7 @@ function App() {
           {canAccess('sales_dashboard') && view === 'sales_dashboard' && (
             <SalesDashboard 
               orders={salesOrders} 
+              productionRecords={records}
               onEditOrder={handleEditOrder}
               userRole={userRole}
               onRefreshData={refreshOrders}

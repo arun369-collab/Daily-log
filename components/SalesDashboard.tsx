@@ -1,20 +1,23 @@
 
 import React, { useState, useMemo } from 'react';
-import { SalesOrder, UserRole } from '../types';
-import { ShoppingBag, MapPin, FileText, CheckCircle, Clock, Eye, X, MessageCircle, Copy, Share2, Printer, ExternalLink, Pencil, Truck, Package, RefreshCw } from 'lucide-react';
+import { SalesOrder, UserRole, ProductionRecord } from '../types';
+import { ShoppingBag, MapPin, FileText, CheckCircle, Clock, Eye, X, MessageCircle, Copy, Share2, Printer, ExternalLink, Pencil, Truck, Package, RefreshCw, ClipboardList } from 'lucide-react';
 import { POPreview } from './POPreview';
+import { DeliveryLedger } from './DeliveryLedger';
 import { saveSalesOrder } from '../services/storageService';
 
 interface SalesDashboardProps {
   orders: SalesOrder[];
+  productionRecords: ProductionRecord[]; // Added for FIFO logic
   onEditOrder: (order: SalesOrder) => void;
   userRole: UserRole;
-  onRefreshData: () => void; // Callback to force reload from parent
+  onRefreshData: () => void;
 }
 
-export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, onEditOrder, userRole, onRefreshData }) => {
+export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, productionRecords, onEditOrder, userRole, onRefreshData }) => {
   const [selectedOrder, setSelectedOrder] = useState<SalesOrder | null>(null);
   const [showPOPreview, setShowPOPreview] = useState(false);
+  const [showDeliveryLedger, setShowDeliveryLedger] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState(false);
   
   // Bulk selection state
@@ -58,6 +61,11 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, onEditOr
     onRefreshData();
     setSelectedIds(new Set()); // Clear selection
     alert(`Updated ${selectedIds.size} orders to ${newStatus}`);
+  };
+  
+  const handleSaveDeliveryUpdates = (updatedOrders: SalesOrder[]) => {
+    updatedOrders.forEach(order => saveSalesOrder(order));
+    onRefreshData();
   };
 
   const generateShareText = (order: SalesOrder) => {
@@ -125,6 +133,19 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, onEditOr
     return <POPreview order={selectedOrder} onClose={() => setShowPOPreview(false)} />;
   }
 
+  // Delivery Ledger Modal
+  if (showDeliveryLedger) {
+    const selectedOrdersList = sortedOrders.filter(o => selectedIds.has(o.id));
+    return (
+      <DeliveryLedger 
+        orders={selectedOrdersList} 
+        productionRecords={productionRecords}
+        onClose={() => setShowDeliveryLedger(false)} 
+        onSaveUpdates={handleSaveDeliveryUpdates}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -146,23 +167,30 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, onEditOr
 
       {/* Bulk Action Bar (Visible when selections exist) */}
       {selectedIds.size > 0 && userRole === 'admin' && (
-        <div className="bg-indigo-900 text-white p-4 rounded-xl shadow-md flex justify-between items-center animate-fadeIn">
+        <div className="bg-indigo-900 text-white p-4 rounded-xl shadow-md flex flex-col md:flex-row gap-4 justify-between items-center animate-fadeIn">
           <div className="font-bold flex items-center gap-2">
             <CheckCircle className="text-green-400" />
             {selectedIds.size} Orders Selected
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap justify-center">
+            <button 
+               onClick={() => setShowDeliveryLedger(true)}
+               className="px-4 py-2 bg-white text-indigo-900 hover:bg-indigo-50 rounded-lg text-sm font-bold transition-colors flex items-center gap-2"
+            >
+              <ClipboardList size={16} /> Prepare Delivery / Print Ledger
+            </button>
+            <div className="w-px bg-indigo-700 mx-2 hidden md:block"></div>
             <button 
               onClick={() => handleBulkStatusUpdate('Processing')}
               className="px-4 py-2 bg-indigo-700 hover:bg-indigo-600 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
             >
-              <Package size={16} /> Mark Processing
+              <Package size={16} /> Processing
             </button>
              <button 
               onClick={() => handleBulkStatusUpdate('Dispatched')}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
             >
-              <Truck size={16} /> Dispatch
+              <Truck size={16} /> Dispatched
             </button>
             <button 
               onClick={() => handleBulkStatusUpdate('Delivered')}

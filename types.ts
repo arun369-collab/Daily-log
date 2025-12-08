@@ -28,6 +28,7 @@ export interface SalesOrderItem {
   calculatedWeightKg: number;
   pricePerKg: number;
   itemValue: number; // calculatedWeightKg * pricePerKg
+  assignedBatch?: string; // Admin assigned batch for delivery
 }
 
 export interface SalesOrder {
