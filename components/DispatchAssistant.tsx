@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { ProductionRecord } from '../types';
-import { Truck, Search, Calendar, Package, ArrowRight, AlertCircle, Pallet } from 'lucide-react';
+import { Truck, Search, Calendar, Package, ArrowRight, AlertCircle, Layers } from 'lucide-react';
 
 interface DispatchAssistantProps {
   records: ProductionRecord[];
@@ -130,7 +130,7 @@ export const DispatchAssistant: React.FC<DispatchAssistantProps> = ({ records })
                     <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Total Stock</p>
                     <p className="text-xl font-bold text-gray-800">{item.totalStockCtn} <span className="text-sm font-normal text-gray-500">ctn</span></p>
                     <p className="text-xs font-medium text-green-600 flex items-center justify-end gap-1">
-                      <Pallet size={12} /> {totalPallets} Pallets
+                      <Layers size={12} /> {totalPallets} Pallets
                     </p>
                   </div>
                 </div>

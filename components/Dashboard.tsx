@@ -5,7 +5,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, LineChart, Line 
 } from 'recharts';
 import { StatCard } from './StatCard';
-import { Package, AlertTriangle, Activity, Scale, Sparkles, Loader2, Box, Pallet } from 'lucide-react';
+import { Package, AlertTriangle, Activity, Scale, Sparkles, Loader2, Box, Layers } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 interface DashboardProps {
@@ -73,7 +73,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ records }) => {
         <StatCard 
           title="Total Pallets" 
           value={stats.totalPallets.toFixed(1)} 
-          icon={Pallet} 
+          icon={Layers} 
           colorClass="text-green-600"
           trend="1 Pallet = 1000 Kg"
         />

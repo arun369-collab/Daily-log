@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { ProductionRecord } from '../types';
-import { Search, Box, AlertTriangle, Scale, FileSpreadsheet, Pallet } from 'lucide-react';
+import { Search, Box, AlertTriangle, Scale, FileSpreadsheet, Layers } from 'lucide-react';
 
 interface BatchRegistryProps {
   records: ProductionRecord[];
@@ -165,7 +165,7 @@ export const BatchRegistry: React.FC<BatchRegistryProps> = ({ records }) => {
                       {batch.size}
                     </span>
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full font-medium print:hidden">
-                       <Pallet size={10} /> {palletCount.toFixed(1)} Pallets
+                       <Layers size={10} /> {palletCount.toFixed(1)} Pallets
                     </span>
                   </div>
                 </div>

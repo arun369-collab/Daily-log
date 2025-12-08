@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ProductionRecord } from '../types';
-import { Save, XCircle, Package, Info, Pallet } from 'lucide-react';
+import { Save, XCircle, Package, Info, Layers } from 'lucide-react';
 import { getFamilies, getTypesForFamily, getProductDef, ProductDefinition, PRODUCT_CATALOG } from '../data/products';
 
 interface DataEntryProps {
@@ -255,7 +255,7 @@ export const DataEntry: React.FC<DataEntryProps> = ({ onSave, onCancel, initialD
                 />
                 {suggestions && (
                   <div className="absolute right-3 top-2.5 flex items-center gap-1 text-xs text-green-600 font-bold bg-green-50 px-2 py-0.5 rounded">
-                    <Pallet size={12} />
+                    <Layers size={12} />
                     <span>≈ {suggestions.pallet.toFixed(2)} Pallets</span>
                   </div>
                 )}
