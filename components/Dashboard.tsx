@@ -5,7 +5,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, LineChart, Line 
 } from 'recharts';
 import { StatCard } from './StatCard';
-import { Package, AlertTriangle, Activity, Scale, Sparkles, Loader2, Box } from 'lucide-react';
+import { Package, AlertTriangle, Activity, Scale, Sparkles, Loader2, Box, Pallet } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 interface DashboardProps {
@@ -22,17 +22,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ records }) => {
     const totalRejected = records.reduce((acc, r) => acc + r.rejectedKg, 0);
     const totalCartons = records.reduce((acc, r) => acc + r.cartonCtn, 0);
     
-    // Rejection Rate Calculation: Rejected / (Good + Rejected) or just Rejected / Total Produced if WeightKg is gross.
-    // Assuming WeightKg is Good production. If WeightKg includes rejected, formula changes. 
-    // Standard: Rate = (Rejected / (Good + Rejected)) * 100.
-    // Let's assume WeightKg is 'Net Good Weight' and RejectedKg is separate.
+    // Pallets Calculation: 1000kg = 1 Pallet
+    const totalPallets = totalWeight / 1000;
+
+    // Rejection Rate Calculation
     const totalProcessed = totalWeight + totalRejected;
     const rejectionRate = totalProcessed > 0 ? ((totalRejected / totalProcessed) * 100).toFixed(2) : "0.00";
     
     // Unique Batches
     const uniqueBatches = new Set(records.map(r => r.batchNo)).size;
 
-    return { totalWeight, totalRejected, totalCartons, rejectionRate, uniqueBatches };
+    return { totalWeight, totalRejected, totalCartons, rejectionRate, uniqueBatches, totalPallets };
   }, [records]);
 
   const chartData = useMemo(() => {
@@ -71,11 +71,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ records }) => {
           trend="Net Good Weight"
         />
         <StatCard 
-          title="Rejection Rate" 
-          value={`${stats.rejectionRate}%`} 
-          icon={AlertTriangle} 
-          colorClass="text-red-500"
-          trend={`Total: ${stats.totalRejected.toFixed(2)} Kg`}
+          title="Total Pallets" 
+          value={stats.totalPallets.toFixed(1)} 
+          icon={Pallet} 
+          colorClass="text-green-600"
+          trend="1 Pallet = 1000 Kg"
         />
         <StatCard 
           title="Total Cartons (CTN)" 
@@ -85,11 +85,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ records }) => {
           trend="Final Packed Units"
         />
         <StatCard 
-          title="Batches Processed" 
-          value={stats.uniqueBatches} 
-          icon={Activity} 
-          colorClass="text-purple-500"
-          trend={`${records.length} total entries`}
+          title="Rejection Rate" 
+          value={`${stats.rejectionRate}%`} 
+          icon={AlertTriangle} 
+          colorClass="text-red-500"
+          trend={`Total: ${stats.totalRejected.toFixed(2)} Kg`}
         />
       </div>
 

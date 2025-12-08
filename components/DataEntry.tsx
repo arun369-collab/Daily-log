@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ProductionRecord } from '../types';
-import { Save, XCircle, Package, Info } from 'lucide-react';
+import { Save, XCircle, Package, Info, Pallet } from 'lucide-react';
 import { getFamilies, getTypesForFamily, getProductDef, ProductDefinition, PRODUCT_CATALOG } from '../data/products';
 
 interface DataEntryProps {
@@ -87,10 +87,12 @@ export const DataEntry: React.FC<DataEntryProps> = ({ onSave, onCancel, initialD
     // Calculate theoretical counts based on weight
     const rawCtn = Number(weightKg) / ctnWeight;
     const rawPkt = Number(weightKg) / pktWeight;
+    const palletCount = Number(weightKg) / 1000;
     
     return {
       ctn: rawCtn, // e.g. 10.5
       pkt: rawPkt, // e.g. 42
+      pallet: palletCount,
       fullCtn: Math.floor(rawCtn),
       remainderPkts: Math.round((Number(weightKg) % ctnWeight) / pktWeight)
     };
@@ -241,15 +243,23 @@ export const DataEntry: React.FC<DataEntryProps> = ({ onSave, onCancel, initialD
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Weight in Kgs</label>
-              <input
-                type="number"
-                required
-                min="0"
-                step="0.01"
-                value={weightKg}
-                onChange={(e) => setWeightKg(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none font-bold text-gray-800"
-              />
+              <div className="relative">
+                <input
+                  type="number"
+                  required
+                  min="0"
+                  step="0.01"
+                  value={weightKg}
+                  onChange={(e) => setWeightKg(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none font-bold text-gray-800"
+                />
+                {suggestions && (
+                  <div className="absolute right-3 top-2.5 flex items-center gap-1 text-xs text-green-600 font-bold bg-green-50 px-2 py-0.5 rounded">
+                    <Pallet size={12} />
+                    <span>≈ {suggestions.pallet.toFixed(2)} Pallets</span>
+                  </div>
+                )}
+              </div>
            </div>
            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Rejected in Kgs</label>

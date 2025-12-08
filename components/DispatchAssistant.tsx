@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { ProductionRecord } from '../types';
-import { Truck, Search, Calendar, Package, ArrowRight, AlertCircle } from 'lucide-react';
+import { Truck, Search, Calendar, Package, ArrowRight, AlertCircle, Pallet } from 'lucide-react';
 
 interface DispatchAssistantProps {
   records: ProductionRecord[];
@@ -11,10 +11,12 @@ interface ProductQueue {
   productName: string;
   size: string;
   totalStockCtn: number;
+  totalStockWeight: number; // Added to track weight for pallet calc
   batches: {
     batchNo: string;
     date: string;
     cartons: number;
+    weight: number;
   }[];
 }
 
@@ -34,6 +36,7 @@ export const DispatchAssistant: React.FC<DispatchAssistantProps> = ({ records })
           productName: r.productName,
           size: r.size,
           totalStockCtn: 0,
+          totalStockWeight: 0,
           batches: []
         });
       }
@@ -45,6 +48,7 @@ export const DispatchAssistant: React.FC<DispatchAssistantProps> = ({ records })
       
       if (existingBatchIndex >= 0) {
         group.batches[existingBatchIndex].cartons += r.cartonCtn;
+        group.batches[existingBatchIndex].weight += r.weightKg;
         // Keep the earliest date for the batch if multiple entries exist
         if (new Date(r.date) < new Date(group.batches[existingBatchIndex].date)) {
            group.batches[existingBatchIndex].date = r.date;
@@ -53,11 +57,13 @@ export const DispatchAssistant: React.FC<DispatchAssistantProps> = ({ records })
         group.batches.push({
           batchNo: r.batchNo,
           date: r.date,
-          cartons: r.cartonCtn
+          cartons: r.cartonCtn,
+          weight: r.weightKg
         });
       }
 
       group.totalStockCtn += r.cartonCtn;
+      group.totalStockWeight += r.weightKg;
     });
 
     // 2. Sort batches within each product by Date (FIFO - Oldest First)
@@ -106,6 +112,7 @@ export const DispatchAssistant: React.FC<DispatchAssistantProps> = ({ records })
         {filteredQueues.map((item) => {
           const priorityBatch = item.batches[0];
           const queueBatches = item.batches.slice(1);
+          const totalPallets = (item.totalStockWeight / 1000).toFixed(1);
 
           return (
             <div key={item.productKey} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
@@ -122,6 +129,9 @@ export const DispatchAssistant: React.FC<DispatchAssistantProps> = ({ records })
                   <div className="text-right">
                     <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Total Stock</p>
                     <p className="text-xl font-bold text-gray-800">{item.totalStockCtn} <span className="text-sm font-normal text-gray-500">ctn</span></p>
+                    <p className="text-xs font-medium text-green-600 flex items-center justify-end gap-1">
+                      <Pallet size={12} /> {totalPallets} Pallets
+                    </p>
                   </div>
                 </div>
               </div>
