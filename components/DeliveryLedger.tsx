@@ -1,7 +1,8 @@
 
 import React, { useState, useMemo } from 'react';
 import { SalesOrder, ProductionRecord } from '../types';
-import { Printer, X, Check, ArrowRight, Layers, Truck, Calendar } from 'lucide-react';
+import { Printer, X, Check, ArrowRight, Layers, Truck, Calendar, Plus, Trash2 } from 'lucide-react';
+import { PRODUCT_CATALOG } from '../data/products';
 
 interface DeliveryLedgerProps {
   orders: SalesOrder[];
@@ -41,6 +42,69 @@ export const DeliveryLedger: React.FC<DeliveryLedgerProps> = ({ orders, producti
     const updated = [...localOrders];
     updated[orderIndex].items[itemIndex].assignedBatch = val;
     setLocalOrders(updated);
+  };
+
+  const handleQuantityChange = (orderIndex: number, itemIndex: number, newQty: number) => {
+    const updated = [...localOrders];
+    const item = updated[orderIndex].items[itemIndex];
+    
+    // Recalculate Weight based on product definition
+    const def = PRODUCT_CATALOG.find(p => p.displayName === item.productName);
+    let weight = 0;
+    
+    if (def) {
+        const ctnWeight = def.getCtnWeight(item.size);
+        weight = newQty * ctnWeight;
+    } else {
+        // Fallback: estimate from current ratio if possible
+        if (item.quantityCtn > 0 && item.calculatedWeightKg > 0) {
+            const unit = item.calculatedWeightKg / item.quantityCtn;
+            weight = newQty * unit;
+        }
+    }
+
+    item.quantityCtn = newQty;
+    item.calculatedWeightKg = weight;
+    
+    // Update total order weight for summary
+    updated[orderIndex].totalWeightKg = updated[orderIndex].items.reduce((sum, i) => sum + i.calculatedWeightKg, 0);
+
+    setLocalOrders(updated);
+  };
+
+  const handleSplitItem = (orderIndex: number, itemIndex: number) => {
+    const updated = [...localOrders];
+    const itemToClone = updated[orderIndex].items[itemIndex];
+    
+    // Create clone with reset values
+    const newItem = { 
+        ...itemToClone, 
+        productId: crypto.randomUUID(), // New Unique ID
+        assignedBatch: '', // Reset batch
+        quantityCtn: 0, // Reset qty to force user input
+        calculatedWeightKg: 0,
+        itemValue: 0
+    };
+    
+    // Insert after current item
+    updated[orderIndex].items.splice(itemIndex + 1, 0, newItem);
+    setLocalOrders(updated);
+  };
+
+  const handleDeleteItem = (orderIndex: number, itemIndex: number) => {
+      const updated = [...localOrders];
+      // Prevent deleting if it's the only item for this product? 
+      // User might want to remove it entirely from delivery manifest, so allow delete.
+      if (updated[orderIndex].items.length <= 1) {
+          alert("Cannot remove the last item from an order. Cancel the delivery preparation instead.");
+          return;
+      }
+      updated[orderIndex].items.splice(itemIndex, 1);
+      
+      // Update total order weight
+      updated[orderIndex].totalWeightKg = updated[orderIndex].items.reduce((sum, i) => sum + i.calculatedWeightKg, 0);
+      
+      setLocalOrders(updated);
   };
 
   const handlePrint = () => {
@@ -114,9 +178,9 @@ export const DeliveryLedger: React.FC<DeliveryLedgerProps> = ({ orders, producti
                     <tr>
                       <th className="px-4 py-2 text-left">Product</th>
                       <th className="px-4 py-2 text-left">Size</th>
-                      <th className="px-4 py-2 text-right">Qty (Ctn)</th>
+                      <th className="px-4 py-2 text-right w-24">Qty (Ctn)</th>
                       <th className="px-4 py-2 text-right">Weight (Kg)</th>
-                      <th className="px-4 py-2 text-left w-64">Assigned Batch (FIFO Hint)</th>
+                      <th className="px-4 py-2 text-left w-80">Assigned Batch (FIFO Hint)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -124,33 +188,60 @@ export const DeliveryLedger: React.FC<DeliveryLedgerProps> = ({ orders, producti
                       const fifoOptions = getFifoBatches(item.productName, item.size);
                       
                       return (
-                        <tr key={iIdx}>
+                        <tr key={item.productId || iIdx}>
                           <td className="px-4 py-3 font-medium text-gray-900">{item.productName}</td>
                           <td className="px-4 py-3 text-gray-600">{item.size}</td>
-                          <td className="px-4 py-3 text-right text-gray-600">{item.quantityCtn}</td>
-                          <td className="px-4 py-3 text-right font-bold text-gray-800">{item.calculatedWeightKg}</td>
+                          <td className="px-4 py-3 text-right">
+                             <input 
+                               type="number"
+                               min="0"
+                               value={item.quantityCtn}
+                               onChange={(e) => handleQuantityChange(oIdx, iIdx, Number(e.target.value))}
+                               className="w-20 px-2 py-1 border border-gray-300 rounded text-right font-bold text-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                             />
+                          </td>
+                          <td className="px-4 py-3 text-right font-bold text-gray-800">{item.calculatedWeightKg.toFixed(0)}</td>
                           <td className="px-4 py-3">
-                            <div className="relative">
-                              <input 
-                                list={`fifo-${order.id}-${iIdx}`}
-                                type="text"
-                                value={item.assignedBatch || ''}
-                                onChange={(e) => handleBatchChange(oIdx, iIdx, e.target.value)}
-                                placeholder="Scan or Type Batch..."
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm font-mono"
-                              />
-                              <datalist id={`fifo-${order.id}-${iIdx}`}>
-                                {fifoOptions.map(opt => (
-                                  <option key={opt.batchNo} value={opt.batchNo}>
-                                    {opt.batchNo} ({opt.date}) - Avail: {opt.totalWeight}kg
-                                  </option>
-                                ))}
-                              </datalist>
-                              {fifoOptions.length > 0 && !item.assignedBatch && (
-                                <div className="text-[10px] text-green-600 mt-1 flex items-center gap-1">
-                                  <Calendar size={10} /> Oldest: {fifoOptions[0].batchNo}
-                                </div>
-                              )}
+                            <div className="flex items-center gap-2">
+                              <div className="relative flex-1">
+                                <input 
+                                  list={`fifo-${order.id}-${iIdx}`}
+                                  type="text"
+                                  value={item.assignedBatch || ''}
+                                  onChange={(e) => handleBatchChange(oIdx, iIdx, e.target.value)}
+                                  placeholder="Scan/Type Batch..."
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm font-mono"
+                                />
+                                <datalist id={`fifo-${order.id}-${iIdx}`}>
+                                  {fifoOptions.map(opt => (
+                                    <option key={opt.batchNo} value={opt.batchNo}>
+                                      {opt.batchNo} ({opt.date}) - Avail: {opt.totalWeight}kg
+                                    </option>
+                                  ))}
+                                </datalist>
+                                {fifoOptions.length > 0 && !item.assignedBatch && (
+                                  <div className="text-[10px] text-green-600 mt-1 flex items-center gap-1">
+                                    <Calendar size={10} /> Oldest: {fifoOptions[0].batchNo}
+                                  </div>
+                                )}
+                              </div>
+                              
+                              {/* Action Buttons: Split / Delete */}
+                              <button 
+                                onClick={() => handleSplitItem(oIdx, iIdx)}
+                                className="p-2 text-green-600 hover:bg-green-50 rounded-lg border border-transparent hover:border-green-200 transition-colors"
+                                title="Split Item (Create duplicate row)"
+                              >
+                                <Plus size={16} />
+                              </button>
+                              
+                              <button 
+                                onClick={() => handleDeleteItem(oIdx, iIdx)}
+                                className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                title="Remove Row"
+                              >
+                                <Trash2 size={16} />
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -202,16 +293,20 @@ export const DeliveryLedger: React.FC<DeliveryLedgerProps> = ({ orders, producti
         <table className="w-full border-collapse border border-black text-sm">
           <thead>
             <tr className="bg-gray-100 print:bg-gray-200">
-              <th className="border border-black px-2 py-2 text-left w-48">Customer / Location</th>
+              <th className="border border-black px-2 py-2 text-left w-24">Customer / Location</th>
               <th className="border border-black px-2 py-2 text-left w-24">Sales Rep</th>
               <th className="border border-black px-2 py-2 text-left">Product Details</th>
-              <th className="border border-black px-2 py-2 text-left w-32">Batch No</th>
-              <th className="border border-black px-2 py-2 text-right w-20">Weight<br/>(Kg)</th>
-              <th className="border border-black px-2 py-2 text-right w-20">Layers<br/>(Pallets)</th>
+              <th className="border border-black px-2 py-2 text-left w-16">Batch No</th>
+              <th className="border border-black px-2 py-2 text-right w-16">Weight<br/>(Kg)</th>
+              <th className="border border-black px-2 py-2 text-right w-16">Layers<br/>(Pallets)</th>
             </tr>
           </thead>
           <tbody>
-            {localOrders.map((order) => (
+            {localOrders.map((order) => {
+              // Recalculate Total Layers for this Order based on the *current* items (including splits)
+              const orderTotalLayers = order.items.reduce((acc, item) => acc + (item.calculatedWeightKg / 1000), 0);
+              
+              return (
               <React.Fragment key={order.id}>
                 {order.items.map((item, idx) => {
                    const isFirst = idx === 0;
@@ -233,15 +328,15 @@ export const DeliveryLedger: React.FC<DeliveryLedgerProps> = ({ orders, producti
                        )}
                        
                        <td className="border border-black px-2 py-1">
-                         <span className="font-medium">{item.productName}</span>
-                         <span className="text-xs ml-1 text-gray-500">({item.size})</span>
-                         <div className="text-[10px] text-gray-400">{item.quantityCtn} CTN</div>
+                         <span className="font-medium text-black">{item.productName}</span>
+                         <span className="text-xs ml-1 font-bold text-black">({item.size})</span>
+                         <div className="text-xs font-bold text-black mt-1">{item.quantityCtn} CTN</div>
                        </td>
-                       <td className="border border-black px-2 py-1 font-mono text-center">
+                       <td className="border border-black px-2 py-1 font-mono text-center font-bold text-black">
                          {item.assignedBatch || '_________'}
                        </td>
                        <td className="border border-black px-2 py-1 text-right">
-                         {item.calculatedWeightKg}
+                         {item.calculatedWeightKg.toFixed(0)}
                        </td>
                        <td className="border border-black px-2 py-1 text-right font-medium">
                          {layers.toFixed(2)}
@@ -252,11 +347,12 @@ export const DeliveryLedger: React.FC<DeliveryLedgerProps> = ({ orders, producti
                 {/* Order Total Row */}
                 <tr className="bg-gray-50 print:bg-gray-100 font-bold">
                    <td colSpan={4} className="border border-black px-2 py-1 text-right text-xs uppercase">Order Total:</td>
-                   <td className="border border-black px-2 py-1 text-right">{order.totalWeightKg}</td>
-                   <td className="border border-black px-2 py-1 text-right">{(order.totalWeightKg / 1000).toFixed(2)}</td>
+                   <td className="border border-black px-2 py-1 text-right">{order.totalWeightKg.toLocaleString()}</td>
+                   <td className="border border-black px-2 py-1 text-right">{orderTotalLayers.toFixed(2)}</td>
                 </tr>
               </React.Fragment>
-            ))}
+            );
+            })}
           </tbody>
           <tfoot>
              <tr className="bg-black text-white print:bg-black print:text-white font-bold text-base">
