@@ -77,6 +77,21 @@ export const saveSalesOrder = (order: SalesOrder): SalesOrder[] => {
   return updated;
 };
 
+export const deleteSalesOrder = (id: string): SalesOrder[] => {
+  const current = getSalesOrders();
+  const updated = current.filter(o => o.id !== id);
+  localStorage.setItem(ORDERS_KEY, JSON.stringify(updated));
+  return updated;
+};
+
+export const deleteSalesOrders = (ids: string[]): SalesOrder[] => {
+  const current = getSalesOrders();
+  const idSet = new Set(ids);
+  const updated = current.filter(o => !idSet.has(o.id));
+  localStorage.setItem(ORDERS_KEY, JSON.stringify(updated));
+  return updated;
+};
+
 // --- Customer Functions ---
 
 export const getCustomers = (): Customer[] => {

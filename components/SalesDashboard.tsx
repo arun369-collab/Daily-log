@@ -1,10 +1,10 @@
 
 import React, { useState, useMemo } from 'react';
 import { SalesOrder, UserRole, ProductionRecord } from '../types';
-import { ShoppingBag, MapPin, FileText, CheckCircle, Clock, Eye, X, MessageCircle, Copy, Share2, Printer, ExternalLink, Pencil, Truck, Package, RefreshCw, ClipboardList, Plus } from 'lucide-react';
+import { ShoppingBag, MapPin, FileText, CheckCircle, Clock, Eye, X, MessageCircle, Copy, Share2, Printer, ExternalLink, Pencil, Truck, Package, RefreshCw, ClipboardList, Plus, Trash2 } from 'lucide-react';
 import { POPreview } from './POPreview';
 import { DeliveryLedger } from './DeliveryLedger';
-import { saveSalesOrder } from '../services/storageService';
+import { saveSalesOrder, deleteSalesOrder, deleteSalesOrders } from '../services/storageService';
 
 // Helper to convert Base64 to File for sharing
 const dataURLtoFile = (dataurl: string, filename: string): File => {
@@ -76,6 +76,23 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
     onRefreshData();
     setSelectedIds(new Set()); // Clear selection
     alert(`Updated ${selectedIds.size} orders to ${newStatus}`);
+  };
+  
+  const handleBulkDelete = () => {
+    if (selectedIds.size === 0) return;
+    if (window.confirm(`Are you sure you want to PERMANENTLY delete ${selectedIds.size} orders?`)) {
+      deleteSalesOrders(Array.from(selectedIds));
+      setSelectedIds(new Set());
+      onRefreshData();
+    }
+  };
+
+  const handleDelete = (id: string) => {
+    if (window.confirm("Are you sure you want to PERMANENTLY delete this order?")) {
+      deleteSalesOrder(id);
+      onRefreshData();
+      if (selectedOrder?.id === id) setSelectedOrder(null);
+    }
   };
   
   const handleSaveDeliveryUpdates = (updatedOrders: SalesOrder[]) => {
@@ -259,6 +276,13 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
             >
               <CheckCircle size={16} /> Delivered
             </button>
+            <div className="w-px bg-indigo-700 mx-2 hidden md:block"></div>
+            <button 
+              onClick={handleBulkDelete}
+              className="px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+            >
+              <Trash2 size={16} /> Delete
+            </button>
           </div>
         </div>
       )}
@@ -372,13 +396,22 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
                     <div className="flex justify-center gap-2">
                        {/* Edit Button - Admin Only (or if pending) */}
                        {userRole === 'admin' && (
-                         <button 
-                           onClick={() => onEditOrder(order)}
-                           className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
-                           title="Edit Order"
-                         >
-                           <Pencil size={18} />
-                         </button>
+                         <>
+                            <button 
+                               onClick={() => onEditOrder(order)}
+                               className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
+                               title="Edit Order"
+                            >
+                               <Pencil size={18} />
+                            </button>
+                            <button 
+                               onClick={() => handleDelete(order.id)}
+                               className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
+                               title="Delete Order"
+                            >
+                               <Trash2 size={18} />
+                            </button>
+                         </>
                        )}
                        <button 
                         onClick={() => setSelectedOrder(order)}
