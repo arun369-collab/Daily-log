@@ -33,6 +33,7 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
   const [showPOPreview, setShowPOPreview] = useState(false);
   const [showDeliveryLedger, setShowDeliveryLedger] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState(false);
+  const [showPasteHint, setShowPasteHint] = useState(false);
   
   // Bulk selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -102,11 +103,12 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
   };
 
   const handleShareWhatsapp = async (order: SalesOrder) => {
+    const text = generateShareText(order);
+
     // Try native share for file support (Web Share API)
     if (order.poFileData && order.poFileName && navigator.share) {
        try {
          const file = dataURLtoFile(order.poFileData, order.poFileName);
-         const text = generateShareText(order);
          const shareData = {
            files: [file],
            title: `Order ${order.poNumber}`,
@@ -114,6 +116,13 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
          };
          
          if (navigator.canShare && navigator.canShare(shareData)) {
+           // Auto-copy text as backup because WhatsApp often ignores text captions for files
+           try {
+             await navigator.clipboard.writeText(text);
+             setShowPasteHint(true);
+             setTimeout(() => setShowPasteHint(false), 8000);
+           } catch(e) {}
+           
            await navigator.share(shareData);
            return;
          }
@@ -123,7 +132,6 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
     }
 
     // Fallback to text link
-    const text = generateShareText(order);
     const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
   };
@@ -148,6 +156,12 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
         const file = dataURLtoFile(order.poFileData, order.poFileName);
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
           shareData.files = [file];
+          // Auto copy text
+          try {
+             await navigator.clipboard.writeText(text);
+             setShowPasteHint(true);
+             setTimeout(() => setShowPasteHint(false), 8000);
+          } catch(e) {}
         }
       } catch(e) { console.warn("File prep failed", e); }
     }
@@ -495,6 +509,11 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
                >
                  <MessageCircle size={20} /> Share via WhatsApp
                </button>
+               {showPasteHint && (
+                 <p className="text-xs text-center text-green-600 mt-2 font-medium bg-green-50 p-2 rounded-lg border border-green-200 animate-pulse">
+                   Text copied! Paste in WhatsApp if missing.
+                 </p>
+               )}
             </div>
           </div>
         </div>

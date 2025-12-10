@@ -75,6 +75,7 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
   // --- Submission State ---
   const [submittedOrder, setSubmittedOrder] = useState<SalesOrder | null>(null);
   const [copyFeedback, setCopyFeedback] = useState(false);
+  const [showPasteHint, setShowPasteHint] = useState(false);
 
   useEffect(() => {
     setCustomers(getCustomers());
@@ -276,12 +277,16 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
     return text;
   };
 
-  const handleCopyToClipboard = () => {
+  const handleCopyToClipboard = async () => {
     if (!submittedOrder) return;
     const text = generateShareText(submittedOrder);
-    navigator.clipboard.writeText(text);
-    setCopyFeedback(true);
-    setTimeout(() => setCopyFeedback(false), 2000);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopyFeedback(true);
+      setTimeout(() => setCopyFeedback(false), 2000);
+    } catch(e) {
+      console.error(e);
+    }
   };
 
   const handleShare = async () => {
@@ -300,6 +305,12 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
          // Check if files can be shared
          if (navigator.canShare && navigator.canShare({ files: [file] })) {
             shareData.files = [file];
+            // Auto copy text as backup
+            try {
+               await navigator.clipboard.writeText(text);
+               setShowPasteHint(true);
+               setTimeout(() => setShowPasteHint(false), 8000);
+            } catch(e) {}
          }
        } catch (e) {
          console.warn("Error preparing file for sharing", e);
@@ -319,12 +330,12 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
 
   const handleWhatsApp = async () => {
     if (!submittedOrder) return;
-    
+    const text = generateShareText(submittedOrder);
+
     // Attempt native share if file exists (this allows attaching the file)
     if (submittedOrder.poFileData && submittedOrder.poFileName && navigator.share) {
        try {
          const file = dataURLtoFile(submittedOrder.poFileData, submittedOrder.poFileName);
-         const text = generateShareText(submittedOrder);
          const shareData = {
            files: [file],
            title: 'New Sales Order',
@@ -332,6 +343,15 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
          };
          
          if (navigator.canShare && navigator.canShare(shareData)) {
+            // Fix for missing text in WhatsApp: Copy to clipboard first
+            try {
+               await navigator.clipboard.writeText(text);
+               setShowPasteHint(true);
+               setTimeout(() => setShowPasteHint(false), 8000);
+            } catch(err) {
+               console.error(err);
+            }
+
             await navigator.share(shareData);
             return;
          }
@@ -341,7 +361,6 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
     }
 
     // Fallback: Just text via URL scheme (no file attachment possible here)
-    const text = generateShareText(submittedOrder);
     const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
   };
@@ -391,6 +410,12 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
             >
               <MessageCircle size={20} /> Share via WhatsApp
             </button>
+
+            {showPasteHint && (
+               <p className="text-xs text-center text-green-700 font-bold bg-green-50 p-2 rounded-lg border border-green-200 animate-pulse">
+                 Text copied! If WhatsApp doesn't show it, please PASTE it.
+               </p>
+            )}
             
             <div className="flex gap-2">
                <button 
