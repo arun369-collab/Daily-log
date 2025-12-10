@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { SalesOrder, UserRole, ProductionRecord } from '../types';
-import { ShoppingBag, MapPin, FileText, CheckCircle, Clock, Eye, X, MessageCircle, Copy, Share2, Printer, ExternalLink, Pencil, Truck, Package, RefreshCw, ClipboardList } from 'lucide-react';
+import { ShoppingBag, MapPin, FileText, CheckCircle, Clock, Eye, X, MessageCircle, Copy, Share2, Printer, ExternalLink, Pencil, Truck, Package, RefreshCw, ClipboardList, Plus } from 'lucide-react';
 import { POPreview } from './POPreview';
 import { DeliveryLedger } from './DeliveryLedger';
 import { saveSalesOrder } from '../services/storageService';
@@ -23,7 +23,7 @@ const dataURLtoFile = (dataurl: string, filename: string): File => {
 interface SalesDashboardProps {
   orders: SalesOrder[];
   productionRecords: ProductionRecord[]; // Added for FIFO logic
-  onEditOrder: (order: SalesOrder) => void;
+  onEditOrder: (order: SalesOrder | null) => void;
   userRole: UserRole;
   onRefreshData: () => void;
 }
@@ -268,13 +268,22 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
           <h3 className="font-bold text-gray-700 flex items-center gap-2">
             <ShoppingBag size={18} /> Recent Orders
           </h3>
-          <button 
-            onClick={onRefreshData}
-            className="text-gray-400 hover:text-indigo-600 transition-colors"
-            title="Refresh List"
-          >
-            <RefreshCw size={18} />
-          </button>
+          <div className="flex items-center gap-2">
+            {/* New Order Button for Admins (since they lack the FAB on mobile) */}
+            <button 
+              onClick={() => onEditOrder(null)}
+              className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-1 shadow-sm"
+            >
+              <Plus size={14} /> New Order
+            </button>
+            <button 
+              onClick={onRefreshData}
+              className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Refresh List"
+            >
+              <RefreshCw size={18} />
+            </button>
+          </div>
         </div>
 
         <div className="overflow-x-auto">

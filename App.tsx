@@ -126,7 +126,7 @@ function App() {
     setEditingOrder(null);
   };
 
-  const handleEditOrder = (order: SalesOrder) => {
+  const handleEditOrder = (order: SalesOrder | null) => {
     setEditingOrder(order);
     setView('sales_entry');
   };
@@ -391,10 +391,14 @@ function App() {
          {/* Admin & Yadav Views */}
          {(userRole === 'admin' || userRole === 'yadav') && (
            <>
+             {/* 1. Home (Both) */}
              <MobileNavIcon target="dashboard" icon={LayoutDashboard} label="Home" />
-             <MobileNavIcon target="ledger_sheet" icon={FileText} label="Report" />
              
-             {/* Center Action */}
+             {/* 2. Left Slot: Admin gets Orders, Yadav gets Report */}
+             {userRole === 'admin' && <MobileNavIcon target="sales_dashboard" icon={ShoppingBag} label="Orders" />}
+             {userRole === 'yadav' && <MobileNavIcon target="ledger_sheet" icon={FileText} label="Report" />}
+             
+             {/* 3. Center Action (Add Production Entry - Both) */}
              <div className="relative -top-6">
                 <button 
                   onClick={() => { setView('entry'); setEditingRecord(null); }}
@@ -404,7 +408,11 @@ function App() {
                 </button>
              </div>
     
-             {canAccess('batches') && <MobileNavIcon target="batches" icon={Archive} label="Batches" />}
+             {/* 4. Right Slot 1: Admin gets Report, Yadav gets Batches */}
+             {userRole === 'admin' && <MobileNavIcon target="ledger_sheet" icon={FileText} label="Report" />}
+             {userRole === 'yadav' && <MobileNavIcon target="batches" icon={Archive} label="Batches" />}
+
+             {/* 5. Right Slot 2: History (Both) */}
              {canAccess('history') && <MobileNavIcon target="history" icon={History} label="History" />}
            </>
          )}
