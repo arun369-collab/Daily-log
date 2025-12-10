@@ -6,6 +6,20 @@ import { POPreview } from './POPreview';
 import { DeliveryLedger } from './DeliveryLedger';
 import { saveSalesOrder } from '../services/storageService';
 
+// Helper to convert Base64 to File for sharing
+const dataURLtoFile = (dataurl: string, filename: string): File => {
+  const arr = dataurl.split(',');
+  const mimeMatch = arr[0].match(/:(.*?);/);
+  const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while(n--){
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new File([u8arr], filename, {type:mime});
+};
+
 interface SalesDashboardProps {
   orders: SalesOrder[];
   productionRecords: ProductionRecord[]; // Added for FIFO logic
@@ -87,7 +101,28 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
     return text;
   };
 
-  const handleShareWhatsapp = (order: SalesOrder) => {
+  const handleShareWhatsapp = async (order: SalesOrder) => {
+    // Try native share for file support (Web Share API)
+    if (order.poFileData && order.poFileName && navigator.share) {
+       try {
+         const file = dataURLtoFile(order.poFileData, order.poFileName);
+         const text = generateShareText(order);
+         const shareData = {
+           files: [file],
+           title: `Order ${order.poNumber}`,
+           text: text
+         };
+         
+         if (navigator.canShare && navigator.canShare(shareData)) {
+           await navigator.share(shareData);
+           return;
+         }
+       } catch (e) {
+         console.warn("File share failed, falling back to URL", e);
+       }
+    }
+
+    // Fallback to text link
     const text = generateShareText(order);
     const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
@@ -102,12 +137,24 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
 
   const handleNativeShare = async (order: SalesOrder) => {
     const text = generateShareText(order);
+    
+    const shareData: any = {
+      title: `Order ${order.poNumber}`,
+      text: text,
+    };
+
+    if (order.poFileData && order.poFileName) {
+      try {
+        const file = dataURLtoFile(order.poFileData, order.poFileName);
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          shareData.files = [file];
+        }
+      } catch(e) { console.warn("File prep failed", e); }
+    }
+
     if (navigator.share) {
       try {
-        await navigator.share({
-          title: `Order ${order.poNumber}`,
-          text: text,
-        });
+        await navigator.share(shareData);
       } catch (err) {
         console.error('Share failed', err);
       }

@@ -6,6 +6,20 @@ import { getFamilies, getTypesForFamily, getProductDef, ProductDefinition } from
 import { getCustomers, saveCustomer } from '../services/storageService';
 import { POPreview } from './POPreview';
 
+// Helper to convert Base64 to File for sharing
+const dataURLtoFile = (dataurl: string, filename: string): File => {
+  const arr = dataurl.split(',');
+  const mimeMatch = arr[0].match(/:(.*?);/);
+  const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while(n--){
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new File([u8arr], filename, {type:mime});
+};
+
 interface SalesEntryProps {
   onSave: (order: SalesOrder) => void;
   onCancel: () => void;
@@ -273,12 +287,28 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
   const handleShare = async () => {
     if (!submittedOrder) return;
     const text = generateShareText(submittedOrder);
+    
+    const shareData: any = {
+      title: 'New Sales Order',
+      text: text,
+    };
+
+    // Prepare file if available
+    if (submittedOrder.poFileData && submittedOrder.poFileName) {
+       try {
+         const file = dataURLtoFile(submittedOrder.poFileData, submittedOrder.poFileName);
+         // Check if files can be shared
+         if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            shareData.files = [file];
+         }
+       } catch (e) {
+         console.warn("Error preparing file for sharing", e);
+       }
+    }
+
     if (navigator.share) {
       try {
-        await navigator.share({
-          title: 'New Sales Order',
-          text: text,
-        });
+        await navigator.share(shareData);
       } catch (err) {
         console.error('Share failed', err);
       }
@@ -287,8 +317,30 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
     }
   };
 
-  const handleWhatsApp = () => {
+  const handleWhatsApp = async () => {
     if (!submittedOrder) return;
+    
+    // Attempt native share if file exists (this allows attaching the file)
+    if (submittedOrder.poFileData && submittedOrder.poFileName && navigator.share) {
+       try {
+         const file = dataURLtoFile(submittedOrder.poFileData, submittedOrder.poFileName);
+         const text = generateShareText(submittedOrder);
+         const shareData = {
+           files: [file],
+           title: 'New Sales Order',
+           text: text
+         };
+         
+         if (navigator.canShare && navigator.canShare(shareData)) {
+            await navigator.share(shareData);
+            return;
+         }
+       } catch (e) {
+         console.warn("File share failed, falling back to URL", e);
+       }
+    }
+
+    // Fallback: Just text via URL scheme (no file attachment possible here)
     const text = generateShareText(submittedOrder);
     const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
