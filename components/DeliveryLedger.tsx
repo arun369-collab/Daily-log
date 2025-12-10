@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { SalesOrder, ProductionRecord } from '../types';
 import { Printer, X, Check, ArrowRight, Layers, Truck, Calendar, Plus, Trash2 } from 'lucide-react';
@@ -306,22 +305,56 @@ export const DeliveryLedger: React.FC<DeliveryLedgerProps> = ({ orders, producti
               // Recalculate Total Layers for this Order based on the *current* items (including splits)
               const orderTotalLayers = order.items.reduce((acc, item) => acc + (item.calculatedWeightKg / 1000), 0);
               
+              // Group items by Product + Size to merge batches for cleaner print output
+              const groupedItemsMap = new Map<string, {
+                productName: string;
+                size: string;
+                quantityCtn: number;
+                calculatedWeightKg: number;
+                batches: Set<string>;
+              }>();
+
+              order.items.forEach(item => {
+                const key = `${item.productName}|${item.size}`;
+                if (!groupedItemsMap.has(key)) {
+                  groupedItemsMap.set(key, {
+                    productName: item.productName,
+                    size: item.size,
+                    quantityCtn: 0,
+                    calculatedWeightKg: 0,
+                    batches: new Set()
+                  });
+                }
+                const group = groupedItemsMap.get(key)!;
+                group.quantityCtn += item.quantityCtn;
+                group.calculatedWeightKg += item.calculatedWeightKg;
+                if (item.assignedBatch && item.assignedBatch.trim()) {
+                  group.batches.add(item.assignedBatch.trim());
+                }
+              });
+
+              const displayItems = Array.from(groupedItemsMap.values());
+
               return (
               <React.Fragment key={order.id}>
-                {order.items.map((item, idx) => {
+                {displayItems.map((item, idx) => {
                    const isFirst = idx === 0;
                    const layers = item.calculatedWeightKg / 1000;
+                   const batchDisplay = item.batches.size > 0 
+                      ? Array.from(item.batches).join(', ') 
+                      : '_________';
+
                    return (
-                     <tr key={`${order.id}-${idx}`} className="break-inside-avoid">
+                     <tr key={`${order.id}-grouped-${idx}`} className="break-inside-avoid">
                        {/* Group Customer Columns */}
                        {isFirst && (
                          <>
-                           <td className="border border-black px-2 py-2 align-top" rowSpan={order.items.length}>
+                           <td className="border border-black px-2 py-2 align-top" rowSpan={displayItems.length}>
                              <div className="font-bold text-black">{order.customerName}</div>
                              <div className="text-xs text-gray-600">{order.city}</div>
                              <div className="text-[10px] mt-1">PO: {order.poNumber}</div>
                            </td>
-                           <td className="border border-black px-2 py-2 align-top" rowSpan={order.items.length}>
+                           <td className="border border-black px-2 py-2 align-top" rowSpan={displayItems.length}>
                              {order.salesPerson}
                            </td>
                          </>
@@ -333,7 +366,7 @@ export const DeliveryLedger: React.FC<DeliveryLedgerProps> = ({ orders, producti
                          <div className="text-xs font-bold text-black mt-1">{item.quantityCtn} CTN</div>
                        </td>
                        <td className="border border-black px-2 py-1 font-mono text-center font-bold text-black">
-                         {item.assignedBatch || '_________'}
+                         {batchDisplay}
                        </td>
                        <td className="border border-black px-2 py-1 text-right">
                          {item.calculatedWeightKg.toFixed(0)}
