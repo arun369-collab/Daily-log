@@ -163,9 +163,19 @@ function App() {
   };
   
   // Refresh orders from local storage or trigger sync if needed
-  const refreshOrders = () => {
+  const refreshOrders = (shouldSyncUp = false) => {
     setSalesOrders(getSalesOrders());
-    if(getSyncUrl()) handleSyncDown();
+    // If this refresh is triggered by a data mutation (delete/update status), we sync UP.
+    // If it's a manual refresh button, we might want to sync DOWN (but for now let's keep it safe).
+    if (shouldSyncUp) {
+      triggerSyncUp();
+    }
+  };
+  
+  // Special handler for manual refresh button that pulls data
+  const handleManualRefresh = () => {
+    setSalesOrders(getSalesOrders());
+    if (getSyncUrl()) handleSyncDown();
   };
 
   const NavItem = ({ target, icon: Icon, label }: { target: ViewState, icon: React.ElementType, label: string }) => (
@@ -372,7 +382,8 @@ function App() {
               productionRecords={records}
               onEditOrder={handleEditOrder}
               userRole={userRole}
-              onRefreshData={refreshOrders}
+              onRefreshData={() => refreshOrders(true)}
+              onManualRefresh={handleManualRefresh}
             />
           )}
 

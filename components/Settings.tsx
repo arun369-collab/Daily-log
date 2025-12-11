@@ -28,19 +28,25 @@ export const Settings: React.FC<SettingsProps> = ({ onLogout }) => {
 
   const scriptCode = `
 function doGet(e) {
-  var file = DriveApp.getFilesByName("FactoryFlow_DB.json");
-  if (file.hasNext()) {
-    return ContentService.createTextOutput(file.next().getBlob().getDataAsString())
+  var fileName = "FactoryFlow_DB.json";
+  var files = DriveApp.getFilesByName(fileName);
+  
+  if (files.hasNext()) {
+    var file = files.next();
+    var content = file.getBlob().getDataAsString();
+    return ContentService.createTextOutput(content)
       .setMimeType(ContentService.MimeType.JSON);
   } else {
-    return ContentService.createTextOutput(JSON.stringify({records:[], orders:[], customers:[]}))
+    // Return empty structure if file doesn't exist yet
+    var initialData = JSON.stringify({records:[], orders:[], customers:[]});
+    return ContentService.createTextOutput(initialData)
       .setMimeType(ContentService.MimeType.JSON);
   }
 }
 
 function doPost(e) {
   var lock = LockService.getScriptLock();
-  lock.tryLock(10000);
+  lock.tryLock(30000); 
   try {
     var data = e.postData.contents;
     var fileName = "FactoryFlow_DB.json";
@@ -109,6 +115,9 @@ function doPost(e) {
             <HelpCircle size={16} /> Setup Instructions (Required for Multi-Device)
           </h3>
           <div className="space-y-3">
+             <div className="text-xs text-blue-700 font-medium">
+               This script creates a database file in your Google Drive. You do NOT need to create a Google Sheet manually.
+             </div>
              <div className="text-xs text-blue-700">
                1. Go to <a href="https://script.google.com/home" target="_blank" className="underline font-bold">script.google.com</a> and create a new project.
              </div>

@@ -26,9 +26,10 @@ interface SalesDashboardProps {
   onEditOrder: (order: SalesOrder | null) => void;
   userRole: UserRole;
   onRefreshData: () => void;
+  onManualRefresh: () => void;
 }
 
-export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, productionRecords, onEditOrder, userRole, onRefreshData }) => {
+export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, productionRecords, onEditOrder, userRole, onRefreshData, onManualRefresh }) => {
   const [selectedOrder, setSelectedOrder] = useState<SalesOrder | null>(null);
   const [showPOPreview, setShowPOPreview] = useState(false);
   const [showDeliveryLedger, setShowDeliveryLedger] = useState(false);
@@ -73,7 +74,7 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
       }
     });
 
-    onRefreshData();
+    onRefreshData(); // Trigger Sync Up
     setSelectedIds(new Set()); // Clear selection
     alert(`Updated ${selectedIds.size} orders to ${newStatus}`);
   };
@@ -83,21 +84,21 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
     if (window.confirm(`Are you sure you want to PERMANENTLY delete ${selectedIds.size} orders?`)) {
       deleteSalesOrders(Array.from(selectedIds));
       setSelectedIds(new Set());
-      onRefreshData();
+      onRefreshData(); // Trigger Sync Up
     }
   };
 
   const handleDelete = (id: string) => {
     if (window.confirm("Are you sure you want to PERMANENTLY delete this order?")) {
       deleteSalesOrder(id);
-      onRefreshData();
+      onRefreshData(); // Trigger Sync Up
       if (selectedOrder?.id === id) setSelectedOrder(null);
     }
   };
   
   const handleSaveDeliveryUpdates = (updatedOrders: SalesOrder[]) => {
     updatedOrders.forEach(order => saveSalesOrder(order));
-    onRefreshData();
+    onRefreshData(); // Trigger Sync Up
   };
 
   const generateShareText = (order: SalesOrder) => {
@@ -301,7 +302,7 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
               <Plus size={14} /> New Order
             </button>
             <button 
-              onClick={onRefreshData}
+              onClick={onManualRefresh}
               className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-gray-100 rounded-lg transition-colors"
               title="Refresh List"
             >
