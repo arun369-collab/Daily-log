@@ -127,3 +127,25 @@ export const deleteCustomer = (id: string): Customer[] => {
   localStorage.setItem(CUSTOMERS_KEY, JSON.stringify(updated));
   return updated;
 };
+
+// --- Full State Import/Export for Cloud Sync ---
+
+export const getAllData = () => ({
+  records: getRecords(),
+  orders: getSalesOrders(),
+  customers: getCustomers(),
+  timestamp: Date.now()
+});
+
+export const importData = (data: any) => {
+  if (!data) return;
+  if (data.records && Array.isArray(data.records)) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data.records));
+  }
+  if (data.orders && Array.isArray(data.orders)) {
+    localStorage.setItem(ORDERS_KEY, JSON.stringify(data.orders));
+  }
+  if (data.customers && Array.isArray(data.customers)) {
+    localStorage.setItem(CUSTOMERS_KEY, JSON.stringify(data.customers));
+  }
+};

@@ -13,10 +13,15 @@ import {
   FileText,
   ShoppingBag,
   ShoppingCart,
-  Users
+  Users,
+  Cloud,
+  RefreshCw,
+  CheckCircle,
+  AlertCircle
 } from 'lucide-react';
 import { ViewState, ProductionRecord, UserRole, SalesOrder } from './types';
-import { getRecords, saveRecord, deleteRecord, getSalesOrders, saveSalesOrder } from './services/storageService';
+import { getRecords, saveRecord, deleteRecord, getSalesOrders, saveSalesOrder, deleteSalesOrder, deleteSalesOrders } from './services/storageService';
+import { syncUp, syncDown, getSyncUrl } from './services/syncService';
 import { Dashboard } from './components/Dashboard';
 import { DataEntry } from './components/DataEntry';
 import { BatchRegistry } from './components/BatchRegistry';
@@ -28,12 +33,11 @@ import { LedgerSheet } from './components/LedgerSheet';
 import { SalesEntry } from './components/SalesEntry';
 import { SalesDashboard } from './components/SalesDashboard';
 import { CustomerDatabase } from './components/CustomerDatabase';
-import { syncToGoogleSheet } from './services/syncService';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userRole, setUserRole] = useState<UserRole>('admin');
-  const [username, setUsername] = useState<string>('Admin'); // Track actual name (e.g. Asim)
+  const [username, setUsername] = useState<string>('Admin'); 
   const [view, setView] = useState<ViewState>('dashboard');
   
   // Data States
@@ -43,6 +47,9 @@ function App() {
   // Sales States
   const [salesOrders, setSalesOrders] = useState<SalesOrder[]>([]);
   const [editingOrder, setEditingOrder] = useState<SalesOrder | null>(null);
+
+  // Sync State
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
 
   useEffect(() => {
     // Check session storage for existing auth
@@ -55,19 +62,43 @@ function App() {
       if (storedRole) {
         setUserRole(storedRole);
         if (storedUser) setUsername(storedUser);
-
-        // Default view logic on reload
-        if (storedRole === 'yadav') {
-          setView('entry');
-        } else if (storedRole === 'sales') {
-          setView('sales_dashboard');
-        }
+        if (storedRole === 'yadav') setView('entry');
+        else if (storedRole === 'sales') setView('sales_dashboard');
       }
     }
-    // Load initial data
+    
+    // Initial Load & Sync
+    loadData();
+    if (getSyncUrl()) {
+      handleSyncDown();
+    }
+  }, []);
+
+  const loadData = () => {
     setRecords(getRecords());
     setSalesOrders(getSalesOrders());
-  }, []);
+  };
+
+  const handleSyncDown = async () => {
+    if (syncStatus === 'syncing') return;
+    setSyncStatus('syncing');
+    const success = await syncDown();
+    if (success) {
+      loadData(); // Reload from storage after import
+      setSyncStatus('success');
+      setTimeout(() => setSyncStatus('idle'), 3000);
+    } else {
+      setSyncStatus('error');
+      setTimeout(() => setSyncStatus('idle'), 3000);
+    }
+  };
+
+  const triggerSyncUp = async () => {
+    setSyncStatus('syncing');
+    await syncUp(); // Fire and forget mostly, but we show status
+    setSyncStatus('success');
+    setTimeout(() => setSyncStatus('idle'), 3000);
+  };
 
   const handleLogin = (role: UserRole, name: string = 'User') => {
     sessionStorage.setItem('factory_flow_auth', 'true');
@@ -77,14 +108,12 @@ function App() {
     setUsername(name);
     setIsAuthenticated(true);
     
-    // Default view logic on login
-    if (role === 'yadav') {
-      setView('entry');
-    } else if (role === 'sales') {
-      setView('sales_dashboard');
-    } else {
-      setView('dashboard');
-    }
+    if (role === 'yadav') setView('entry');
+    else if (role === 'sales') setView('sales_dashboard');
+    else setView('dashboard');
+    
+    // Attempt sync on login
+    if (getSyncUrl()) handleSyncDown();
   };
 
   const handleLogout = () => {
@@ -93,7 +122,7 @@ function App() {
     sessionStorage.removeItem('factory_flow_username');
     setIsAuthenticated(false);
     setView('dashboard');
-    setUserRole('admin'); // Reset to default
+    setUserRole('admin');
     setUsername('Admin');
   };
 
@@ -101,9 +130,9 @@ function App() {
   const handleSave = (record: ProductionRecord) => {
     const updated = saveRecord(record);
     setRecords(updated);
-    syncToGoogleSheet(record); // Production Sync
     setView('dashboard');
     setEditingRecord(null);
+    triggerSyncUp();
   };
 
   const handleEdit = (record: ProductionRecord) => {
@@ -115,6 +144,7 @@ function App() {
     if(window.confirm("Are you sure you want to delete this record?")) {
       const updated = deleteRecord(id);
       setRecords(updated);
+      triggerSyncUp();
     }
   };
 
@@ -122,17 +152,20 @@ function App() {
   const handleSaveOrder = (order: SalesOrder) => {
     const updated = saveSalesOrder(order);
     setSalesOrders(updated);
-    // Note: We stay on SalesEntry to show success popup
+    // Stay on view (SalesEntry handles close)
     setEditingOrder(null);
+    triggerSyncUp();
   };
 
   const handleEditOrder = (order: SalesOrder | null) => {
     setEditingOrder(order);
     setView('sales_entry');
   };
-
+  
+  // Refresh orders from local storage or trigger sync if needed
   const refreshOrders = () => {
     setSalesOrders(getSalesOrders());
+    if(getSyncUrl()) handleSyncDown();
   };
 
   const NavItem = ({ target, icon: Icon, label }: { target: ViewState, icon: React.ElementType, label: string }) => (
@@ -169,6 +202,38 @@ function App() {
     </button>
   );
 
+  // Sync Indicator Component
+  const SyncIndicator = () => {
+    if (!getSyncUrl()) return null;
+    return (
+      <button 
+        onClick={handleSyncDown}
+        className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium transition-all ${
+           syncStatus === 'syncing' ? 'bg-blue-100 text-blue-700' :
+           syncStatus === 'success' ? 'bg-green-100 text-green-700' :
+           syncStatus === 'error' ? 'bg-red-100 text-red-700' :
+           'bg-gray-100 text-gray-600 hover:bg-gray-200'
+        }`}
+        title="Sync with Cloud"
+      >
+        {syncStatus === 'syncing' ? (
+           <RefreshCw size={14} className="animate-spin" />
+        ) : syncStatus === 'success' ? (
+           <CheckCircle size={14} />
+        ) : syncStatus === 'error' ? (
+           <AlertCircle size={14} />
+        ) : (
+           <Cloud size={14} />
+        )}
+        <span className="hidden md:inline">
+          {syncStatus === 'syncing' ? 'Syncing...' : 
+           syncStatus === 'success' ? 'Synced' : 
+           syncStatus === 'error' ? 'Failed' : 'Sync'}
+        </span>
+      </button>
+    );
+  };
+
   // If not authenticated, show Login screen
   if (!isAuthenticated) {
     return <Login onLogin={handleLogin} />;
@@ -177,15 +242,8 @@ function App() {
   // Permission Check Helper
   const canAccess = (feature: ViewState) => {
     if (userRole === 'admin') return true;
-    
-    if (userRole === 'yadav') {
-      return ['dashboard', 'entry', 'ledger_sheet'].includes(feature);
-    }
-    
-    if (userRole === 'sales') {
-      return ['sales_dashboard', 'sales_entry', 'customers'].includes(feature);
-    }
-    
+    if (userRole === 'yadav') return ['dashboard', 'entry', 'ledger_sheet'].includes(feature);
+    if (userRole === 'sales') return ['sales_dashboard', 'sales_entry', 'customers'].includes(feature);
     return false;
   };
 
@@ -197,21 +255,24 @@ function App() {
         <div className="flex items-center gap-2 text-blue-700 font-bold text-lg">
           <Factory className="text-blue-600" /> FactoryFlow
         </div>
-        {userRole === 'admin' ? (
-          <button 
-            onClick={() => setView('settings')}
-            className={`p-2 rounded-full ${view === 'settings' ? 'bg-gray-100 text-blue-600' : 'text-gray-500'}`}
-          >
-            <SettingsIcon size={24} />
-          </button>
-        ) : (
-          <button 
-            onClick={handleLogout}
-            className="p-2 rounded-full text-red-500 bg-red-50"
-          >
-            <LogOut size={20} />
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+           <SyncIndicator />
+           {userRole === 'admin' ? (
+            <button 
+              onClick={() => setView('settings')}
+              className={`p-2 rounded-full ${view === 'settings' ? 'bg-gray-100 text-blue-600' : 'text-gray-500'}`}
+            >
+              <SettingsIcon size={24} />
+            </button>
+          ) : (
+            <button 
+              onClick={handleLogout}
+              className="p-2 rounded-full text-red-500 bg-red-50"
+            >
+              <LogOut size={20} />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Desktop Sidebar Navigation */}
@@ -226,16 +287,9 @@ function App() {
           {canAccess('entry') && <NavItem target="entry" icon={PlusCircle} label="Add Ledger Entry" />}
           {canAccess('ledger_sheet') && <NavItem target="ledger_sheet" icon={FileText} label="Daily Report" />}
           
-          {canAccess('batches') && (
-            <NavItem target="batches" icon={Archive} label="Batch Registry" />
-          )}
-          
-          {canAccess('dispatch') && (
-            <NavItem target="dispatch" icon={Truck} label="Dispatch Helper" />
-          )}
-          {canAccess('history') && (
-            <NavItem target="history" icon={History} label="History" />
-          )}
+          {canAccess('batches') && <NavItem target="batches" icon={Archive} label="Batch Registry" />}
+          {canAccess('dispatch') && <NavItem target="dispatch" icon={Truck} label="Dispatch Helper" />}
+          {canAccess('history') && <NavItem target="history" icon={History} label="History" />}
 
           {/* Sales Links */}
           {(canAccess('sales_dashboard') || canAccess('customers')) && (
@@ -249,13 +303,12 @@ function App() {
         </nav>
 
         <div className="pt-4 mt-auto border-t border-gray-100 space-y-2">
-           <div className="px-4 py-2 mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-             User: {username}
+           <div className="px-4 py-2 mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider flex justify-between items-center">
+             <span>User: {username}</span>
+             <SyncIndicator />
            </div>
            
-           {canAccess('settings') && (
-             <NavItem target="settings" icon={SettingsIcon} label="Settings" />
-           )}
+           {canAccess('settings') && <NavItem target="settings" icon={SettingsIcon} label="Settings" />}
            
            <button
             onClick={handleLogout}
@@ -388,17 +441,13 @@ function App() {
       {/* Mobile Bottom Navigation Bar */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-30 h-16 px-2 flex justify-between items-center print:hidden safe-area-pb">
          
-         {/* Admin & Yadav Views */}
          {(userRole === 'admin' || userRole === 'yadav') && (
            <>
-             {/* 1. Home (Both) */}
              <MobileNavIcon target="dashboard" icon={LayoutDashboard} label="Home" />
              
-             {/* 2. Left Slot: Admin gets Orders, Yadav gets Report */}
              {userRole === 'admin' && <MobileNavIcon target="sales_dashboard" icon={ShoppingBag} label="Orders" />}
              {userRole === 'yadav' && <MobileNavIcon target="ledger_sheet" icon={FileText} label="Report" />}
              
-             {/* 3. Center Action (Add Production Entry - Both) */}
              <div className="relative -top-6">
                 <button 
                   onClick={() => { setView('entry'); setEditingRecord(null); }}
@@ -408,16 +457,13 @@ function App() {
                 </button>
              </div>
     
-             {/* 4. Right Slot 1: Admin gets Report, Yadav gets Batches */}
              {userRole === 'admin' && <MobileNavIcon target="ledger_sheet" icon={FileText} label="Report" />}
              {userRole === 'yadav' && <MobileNavIcon target="batches" icon={Archive} label="Batches" />}
 
-             {/* 5. Right Slot 2: History (Both) */}
              {canAccess('history') && <MobileNavIcon target="history" icon={History} label="History" />}
            </>
          )}
 
-         {/* Sales Only Views */}
          {userRole === 'sales' && (
            <>
               <MobileNavIcon target="sales_dashboard" icon={ShoppingBag} label="Orders" />
@@ -430,10 +476,9 @@ function App() {
                   <Plus size={32} />
                 </button>
              </div>
-             <div className="w-8"></div> {/* Spacer */}
+             <div className="w-8"></div>
            </>
          )}
-
       </nav>
     </div>
   );
