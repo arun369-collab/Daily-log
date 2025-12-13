@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { ViewState, ProductionRecord, UserRole, SalesOrder } from './types';
 import { getRecords, saveRecord, deleteRecord, getSalesOrders, saveSalesOrder, deleteSalesOrder, deleteSalesOrders } from './services/storageService';
-import { syncUp, syncDown, getSyncUrl } from './services/syncService';
+import { syncUp, syncDown, isSyncEnabled } from './services/syncService';
 import { Dashboard } from './components/Dashboard';
 import { DataEntry } from './components/DataEntry';
 import { BatchRegistry } from './components/BatchRegistry';
@@ -69,7 +69,7 @@ function App() {
     
     // Initial Load & Sync
     loadData();
-    if (getSyncUrl()) {
+    if (isSyncEnabled()) {
       handleSyncDown();
     }
   }, []);
@@ -113,7 +113,7 @@ function App() {
     else setView('dashboard');
     
     // Attempt sync on login
-    if (getSyncUrl()) handleSyncDown();
+    if (isSyncEnabled()) handleSyncDown();
   };
 
   const handleLogout = () => {
@@ -175,7 +175,7 @@ function App() {
   // Special handler for manual refresh button that pulls data
   const handleManualRefresh = () => {
     setSalesOrders(getSalesOrders());
-    if (getSyncUrl()) handleSyncDown();
+    if (isSyncEnabled()) handleSyncDown();
   };
 
   const NavItem = ({ target, icon: Icon, label }: { target: ViewState, icon: React.ElementType, label: string }) => (
@@ -214,7 +214,7 @@ function App() {
 
   // Sync Indicator Component
   const SyncIndicator = () => {
-    if (!getSyncUrl()) return null;
+    if (!isSyncEnabled()) return null;
     return (
       <button 
         onClick={handleSyncDown}
