@@ -12,26 +12,26 @@ const STOCK_CALCULATION_START_DATE = '2024-12-10';
 // --- Master Data from Excel ---
 const MASTER_STOCK_LIST: PackingStockItem[] = [
   // Packets (PD)
-  { id: 'PD1001', itemNo: '101458CD004', name: 'PACKETS 6013 - 50 X 70 X 360', openingStock: 28669, unit: 'PCS', remark: 'Each Carton 300pcs 4.0kg' },
-  { id: 'PD1002', itemNo: '2700011918', name: 'PACKETS 7018 - 60 X 75 X 360 (5.0 KG)', openingStock: 5378, unit: 'PCS', remark: 'Each Carton 350pcs 5.0kg', lowStockThreshold: 5400 },
+  { id: 'PD1001', itemNo: '101458CD004', name: 'PACKETS 6013 - 50 X 70 X 360', openingStock: 28669, unit: 'PCS', remark: 'F4 - Each Carton 300pcs 4.0kg' },
+  { id: 'PD1002', itemNo: '2700011918', name: 'PACKETS 7018 - 60 X 75 X 360 (5.0 KG)', openingStock: 5378, unit: 'PCS', remark: 'F5 - Each Carton 350pcs 5.0kg', lowStockThreshold: 5400 },
   { id: 'PD1003', itemNo: '', name: 'PACKETS 7018 - 50 X 75 X 460', openingStock: 11193, unit: 'PCS', remark: 'Each Carton 200pcs 5.0kg' },
   { id: 'PD1004', itemNo: '101458CD003', name: 'PACKETS 7018 - 40 X 60 X 360 (2.5 KG)', openingStock: 16500, unit: 'PCS', remark: 'Each Carton 300pcs 2.5kg' },
   { id: 'PD1005', itemNo: '101458CD005', name: 'PACKETS 6013 - 50 X 3.5 X 360', openingStock: 46011, unit: 'PCS', remark: 'Each Carton 375pcs 2.0kg' },
-  { id: 'PD1006', itemNo: '101458CD005', name: 'PLAIN Vac-PACKETS - 50 X 3.5 X 360', openingStock: 12750, unit: 'PCS', remark: 'Each Carton 300pcs 2.0kg', lowStockThreshold: 12500 },
+  { id: 'PD1006', itemNo: '101458CD005', name: 'PLAIN Vac-PACKETS - 50 X 3.5 X 360', openingStock: 12750, unit: 'PCS', remark: 'F9 - Each Carton 300pcs 2.0kg', lowStockThreshold: 12500 },
   { id: 'PD1007', itemNo: '101458CD006', name: 'PACKETS 6013 - 50 X 65 X 400', openingStock: 6785, unit: 'PCS', remark: 'Each Carton 250pcs 5.0kg' },
   { id: 'PD1008', itemNo: '', name: 'PLAIN PACKETS - 50 X 70 X 460', openingStock: 5700, unit: 'PCS', remark: 'Each Carton 200pcs 5.0kg' },
   
   // Cartons (PC)
   { id: 'PC1001', itemNo: '101458CC002', name: 'CARTON - 7018 - 80 X 28 X 470', openingStock: 0, unit: 'PCS', remark: 'Each Carton 60pcs', lowStockThreshold: 10 },
-  { id: 'PC1002', itemNo: '101458CC001', name: 'CARTON - 7018 - 90 X 25 X 370', openingStock: 5376, unit: 'PCS', remark: 'Each Carton 50pcs' },
+  { id: 'PC1002', itemNo: '101458CC001', name: 'CARTON - 7018 - 90 X 25 X 370', openingStock: 5376, unit: 'PCS', remark: 'F13 - Each Carton 50pcs' },
   { id: 'PC1003', itemNo: '101458CC004', name: 'CARTON - 6013 - 70 X 22 X 370', openingStock: 12631, unit: 'PCS', remark: 'F14 - Shared by 6013 & Ni Containers' },
   { id: 'PC1004', itemNo: '101458CC005', name: 'CARTON - 7018 - 70 X 22 X 470', openingStock: 7150, unit: 'PCS', remark: 'Each Carton 50pcs' },
-  { id: 'PC1005', itemNo: '101458CC007', name: 'CARTON - VACCUM - 30.2X39X8', openingStock: 12732, unit: 'PCS', remark: 'Each Carton 50pcs' },
+  { id: 'PC1005', itemNo: '101458CC007', name: 'CARTON - VACCUM - 30.2X39X8', openingStock: 12732, unit: 'PCS', remark: 'F16 - Each Carton 50pcs' },
   { id: 'PC1006', itemNo: '101458CD001', name: 'CARTON - 6013 - 70 X 213 X 420 (20KG)', openingStock: 2250, unit: 'PCS', remark: 'Each Carton 50pcs' },
 
   // Vacuum Foil (VP)
   { id: 'VP1001', itemNo: '', name: 'VACUUM FOIL BAG 20K pcs', openingStock: 18200, unit: 'PCS', remark: '' },
-  { id: 'VP1002', itemNo: '', name: 'VACUUM Aluminium FOIL BAG 20K pcs', openingStock: 2434, unit: 'PCS', remark: 'Each Carton 1200 bags' },
+  { id: 'VP1002', itemNo: '', name: 'VACUUM Aluminium FOIL BAG 20K pcs', openingStock: 2434, unit: 'PCS', remark: 'F27 - Matches F9 usage' },
 
   // Containers (PB)
   { id: 'PB1001', itemNo: '', name: 'Plastic container Silver colour NiFe', openingStock: 5793, unit: 'PCS', remark: 'Each Carton 500 box' },
@@ -59,75 +59,86 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
       // DATE FILTER: Ignore records before the stock take date
       if (r.date < STOCK_CALCULATION_START_DATE) return;
 
-      // Determine which Packing Material was used based on Product Name & Type
       const name = r.productName.toUpperCase();
-      
-      // Determine Type
-      // STRICT LOGIC: 
-      // 1. "VACUUM" keyword -> PD1006 (G9) + PC1005 + Foil
-      // 2. "7024" -> PD1008 (Plain 460mm) + PC1002 (Standard) -> NOT G9
-      // 3. "6013" -> PD1001/PC1003
-      // 4. "Container" -> PB1001/PB1002 + PC1003
-      
-      const isVacuum = name.includes('VACUUM');
-      const is7024 = name.includes('7024');
-      const is6013 = name.includes('6013');
-      const isContainer = name.includes('CONTAINER') || name.includes('NI');
-      
       let packetId = '';
       let cartonId = '';
       
-      // Logic mapping
-      if (is6013) {
-        packetId = 'PD1001'; // Default 6013 Packet
-        cartonId = 'PC1003'; // Default 6013 Carton (F14)
-      } else if (is7024) {
-        // 7024 is usually 450mm, so it uses PD1008 (460mm Plain)
-        // It should NOT increase PD1006 (G9) usage
+      // LOGIC MAPPING ---------------------------
+      
+      // 1. NI & NIFE
+      // "for ni as f14 and F29"
+      if (name.includes('NI')) {
+         if (name.includes('NIFE')) {
+             packetId = 'PB1001'; // Silver Container (NiFe)
+         } else {
+             packetId = 'PB1002'; // F29 Gold Container (Ni)
+         }
+         cartonId = 'PC1003'; // F14 - Shared Carton
+      } 
+      
+      // 2. 6013 NORMAL
+      // "6013 normal as f4 and f14"
+      else if (name.includes('6013')) {
+          packetId = 'PD1001'; // F4
+          cartonId = 'PC1003'; // F14
+      } 
+      
+      // 3. 7018 PRODUCTS
+      else if (name.includes('7018')) {
+          // "for vaccum 7018 use f9 and f16"
+          if (name.includes('VACUUM')) {
+              packetId = 'PD1006'; // F9
+              cartonId = 'PC1005'; // F16
+          } 
+          // "for 7018 normal pack use f5 and f13"
+          else {
+              packetId = 'PD1002'; // F5
+              cartonId = 'PC1002'; // F13
+          }
+      }
+      
+      // 4. EXCEPTIONS & OTHERS
+      else if (name.includes('7024')) {
+        // 7024 is technically vacuum but usually longer (450mm), 
+        // using PD1008 + Standard Carton to avoid polluting F9/F16
         packetId = 'PD1008';
-        cartonId = 'PC1002'; // Assume standard 7018 carton or maybe Vacuum carton? Keeping safe with PC1002
-      } else if (isVacuum) {
-        packetId = 'PD1006'; // Plain Vac-PACKETS (G9)
-        cartonId = 'PC1005'; // CARTON - VACCUM
-        
-        // SPECIAL RULE: "Whatever number we enter in F9 (PD1006) same data we enter on F27 (VP1002)"
-        // So we increment Foil Bag usage too
-        const currentFoil = issuedMap.get('VP1002') || 0;
-        issuedMap.set('VP1002', currentFoil + r.duplesPkt);
-      } else if (isContainer) {
-        // Handle Containers
-        // NiFe -> Silver (PB1001)
-        // Ni   -> Gold (PB1002) [F29]
-        packetId = name.includes('NIFE') ? 'PB1001' : 'PB1002';
-        
-        // SHARED RESOURCE RULE:
-        // Ni/NiFe products are packed in Containers (PacketID above)
-        // BUT they are placed inside 6013 Cartons (PC1003) [F14]
-        cartonId = 'PC1003'; 
-      } else {
-        // Fallback for 7018 Normal, 7018-1 Normal, 8018 Normal
-        // Default to PD1002 (Main 7018 Packet) as primary default
-        packetId = 'PD1002';
         cartonId = 'PC1002';
       }
+      else if (name.includes('VACUUM')) {
+          // Catch-all for other Vacuums (e.g. 8018-B2) -> Use F9/F16 default
+          packetId = 'PD1006'; // F9
+          cartonId = 'PC1005'; // F16
+      }
+      else {
+          // General Fallback
+          packetId = 'PD1002'; // F5
+          cartonId = 'PC1002'; // F13
+      }
+      
+      // -----------------------------------------
 
-      // Add Packets Used
+      // Record Usage
       if (packetId) {
         const currentPkt = issuedMap.get(packetId) || 0;
         issuedMap.set(packetId, currentPkt + r.duplesPkt);
       }
 
-      // Add Cartons Used
       if (cartonId) {
         const currentCtn = issuedMap.get(cartonId) || 0;
         issuedMap.set(cartonId, currentCtn + r.cartonCtn);
+      }
+
+      // Special Rule: "keep f27 same as f9"
+      // Whenever F9 (PD1006) is used, we use F27 (VP1002)
+      if (packetId === 'PD1006') {
+          const currentFoil = issuedMap.get('VP1002') || 0;
+          issuedMap.set('VP1002', currentFoil + r.duplesPkt);
       }
     });
 
     // 2. Calculate Inwards from Transactions
     const inwardMap = new Map<string, number>();
     transactions.forEach(t => {
-      // Inwards are manual additions, usually done AFTER stock take, so we assume they are valid
       const current = inwardMap.get(t.itemId) || 0;
       inwardMap.set(t.itemId, current + t.qty);
     });
