@@ -6,8 +6,8 @@ import { Package, Plus, ArrowDown, Search, Calendar } from 'lucide-react';
 
 // --- Configuration ---
 // Records before this date will NOT be deducted from the Opening Stock.
-// This ensures the "Opening Stock" acts as the balance "As of Morning of Dec 10th".
-const STOCK_CALCULATION_START_DATE = '2024-12-10';
+// This ensures the "Opening Stock" acts as the balance "As of Morning of Dec 11th".
+const STOCK_CALCULATION_START_DATE = '2024-12-11';
 
 // --- Master Data from Excel ---
 const MASTER_STOCK_LIST: PackingStockItem[] = [
