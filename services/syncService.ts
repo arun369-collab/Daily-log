@@ -3,55 +3,37 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore';
 import { getAllData, importData } from './storageService';
 
-const FIREBASE_CONFIG_KEY = 'factory_flow_firebase_config';
-
-// --- Configuration Management ---
-
-export const getSyncConfig = (): string => {
-  return localStorage.getItem(FIREBASE_CONFIG_KEY) || '';
+// Firebase Configuration provided by user
+const firebaseConfig = {
+  apiKey: "AIzaSyAsCS81wTTrCu7HSkcx_vGf-L6GpIqrlMQ",
+  authDomain: "factoryflow-db497.firebaseapp.com",
+  projectId: "factoryflow-db497",
+  storageBucket: "factoryflow-db497.firebasestorage.app",
+  messagingSenderId: "669334174974",
+  appId: "1:669334174974:web:e26bbcec6cb0181073b9af",
+  measurementId: "G-L0F8ZSKX3E"
 };
 
-export const saveSyncConfig = (configJson: string) => {
-  localStorage.setItem(FIREBASE_CONFIG_KEY, configJson.trim());
-};
+// Initialize Firebase
+// We check getApps() to avoid double initialization during hot-reloads
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// Helper to expose project ID to Settings UI
+export const getProjectId = () => firebaseConfig.projectId;
 
 export const isSyncEnabled = (): boolean => {
-  return !!getSyncConfig();
-};
-
-// --- Firebase Initialization Helper ---
-
-const getDb = () => {
-  const configStr = getSyncConfig();
-  if (!configStr) throw new Error("Firebase config not found");
-
-  let config;
-  try {
-    // Try to parse the config. If user pasted "const firebaseConfig = { ... }", we clean it up.
-    const cleanStr = configStr.replace(/const\s+\w+\s*=\s*/, '').replace(/;$/, '');
-    config = JSON.parse(cleanStr);
-  } catch (e) {
-    console.error("Invalid JSON config", e);
-    throw new Error("Invalid Firebase Configuration Format");
-  }
-
-  // Avoid initializing multiple times
-  const app = getApps().length > 0 ? getApp() : initializeApp(config);
-  return getFirestore(app);
+  return true;
 };
 
 // --- Cloud Sync Functions ---
 
 // 1. PUSH: Send local data to Firebase Firestore
 export const syncUp = async (): Promise<boolean> => {
-  if (!isSyncEnabled()) return false;
-
   try {
-    const db = getDb();
     const data = getAllData();
     
     // We store everything in a single document 'factory/backup' for simplicity
-    // Ideally, we would split collections, but this keeps the 'dump/restore' logic intact
     await setDoc(doc(db, "factory", "backup"), data);
     
     console.log("Sync UP: Data sent to Firebase");
@@ -64,10 +46,7 @@ export const syncUp = async (): Promise<boolean> => {
 
 // 2. PULL: Fetch data from Firebase Firestore
 export const syncDown = async (): Promise<boolean> => {
-  if (!isSyncEnabled()) return false;
-
   try {
-    const db = getDb();
     const docRef = doc(db, "factory", "backup");
     const docSnap = await getDoc(docRef);
 
@@ -78,7 +57,8 @@ export const syncDown = async (): Promise<boolean> => {
       return true;
     } else {
       console.log("No backup found on cloud yet.");
-      return true; // Connection worked, just no data
+      // It's a successful connection, just empty data
+      return true;
     }
   } catch (error) {
     console.error("Sync DOWN Failed", error);
