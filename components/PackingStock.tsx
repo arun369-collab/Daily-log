@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { ProductionRecord, PackingStockItem, StockTransaction } from '../types';
 import { getStockTransactions, saveStockTransaction } from '../services/storageService';
-import { Package, Plus, ArrowDown, Search, Calendar } from 'lucide-react';
+import { Package, Plus, ArrowDown, Search, Calendar, RefreshCw, Filter } from 'lucide-react';
 
 // --- Configuration ---
 // Records before this date will NOT be deducted from the Opening Stock.
@@ -46,18 +46,33 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [inwardModalItem, setInwardModalItem] = useState<PackingStockItem | null>(null);
   const [inwardQty, setInwardQty] = useState('');
+  const [refreshKey, setRefreshKey] = useState(0); // Force re-calc
   
   // Transactions State
   const [transactions, setTransactions] = useState<StockTransaction[]>(getStockTransactions());
 
   // --- Auto-Calculation Logic ---
-  const stockData = useMemo(() => {
+  const { stockData, includedCount, excludedCount } = useMemo(() => {
     // 1. Calculate Issued Qty from Production Records
     const issuedMap = new Map<string, number>();
+    let incCount = 0;
+    let excCount = 0;
     
+    // Strict Date Comparison
+    const startObj = new Date(STOCK_CALCULATION_START_DATE);
+    startObj.setHours(0,0,0,0);
+
     records.forEach(r => {
-      // DATE FILTER: Ignore records before the stock take date
-      if (r.date < STOCK_CALCULATION_START_DATE) return;
+      // Parse record date
+      const rDate = new Date(r.date);
+      rDate.setHours(0,0,0,0);
+
+      // DATE FILTER: Ignore records strictly before the stock take date
+      if (rDate < startObj) {
+        excCount++;
+        return;
+      }
+      incCount++;
 
       const name = r.productName.toUpperCase();
       let packetId = '';
@@ -144,7 +159,7 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
     });
 
     // 3. Combine All
-    return MASTER_STOCK_LIST.map(item => {
+    const data = MASTER_STOCK_LIST.map(item => {
       const inward = inwardMap.get(item.id) || 0;
       const issued = issuedMap.get(item.id) || 0;
       const available = item.openingStock + inward - issued;
@@ -158,7 +173,9 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
       };
     });
 
-  }, [records, transactions]);
+    return { stockData: data, includedCount: incCount, excludedCount: excCount };
+
+  }, [records, transactions, refreshKey]);
 
   const handleSaveInward = () => {
     if (!inwardModalItem || !inwardQty) return;
@@ -192,22 +209,38 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
         </div>
         <div className="flex-1">
           <h2 className="text-xl font-bold text-gray-800">Packing Material Stock</h2>
-          <div className="flex items-center gap-2 text-sm text-gray-500">
-             <span>Tracking from:</span>
-             <span className="bg-gray-100 px-2 py-0.5 rounded font-mono text-gray-700 flex items-center gap-1">
-               <Calendar size={12} /> {STOCK_CALCULATION_START_DATE}
-             </span>
+          <div className="flex flex-wrap items-center gap-4 text-sm mt-1">
+             <div className="flex items-center gap-1 text-gray-600 bg-gray-100 px-2 py-1 rounded">
+                <Calendar size={14} /> 
+                <span>Start: <strong>{STOCK_CALCULATION_START_DATE}</strong></span>
+             </div>
+             <div className="flex items-center gap-1 text-green-700 bg-green-50 px-2 py-1 rounded">
+                <Filter size={14} />
+                <span>Included: <strong>{includedCount}</strong> records</span>
+             </div>
+             <div className="flex items-center gap-1 text-gray-400">
+                <span>(Excluded: {excludedCount} old records)</span>
+             </div>
           </div>
         </div>
-        <div className="relative w-full md:w-64">
-           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-           <input 
-             type="text" 
-             placeholder="Search items..." 
-             value={searchTerm}
-             onChange={(e) => setSearchTerm(e.target.value)}
-             className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg w-full outline-none focus:ring-2 focus:ring-amber-500"
-           />
+        <div className="flex gap-2 w-full md:w-auto">
+          <div className="relative flex-1 md:w-64">
+             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+             <input 
+               type="text" 
+               placeholder="Search items..." 
+               value={searchTerm}
+               onChange={(e) => setSearchTerm(e.target.value)}
+               className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg w-full outline-none focus:ring-2 focus:ring-amber-500"
+             />
+          </div>
+          <button 
+             onClick={() => setRefreshKey(k => k + 1)}
+             className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+             title="Recalculate Stock"
+          >
+             <RefreshCw size={20} />
+          </button>
         </div>
       </div>
 
