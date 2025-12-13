@@ -2,7 +2,12 @@
 import React, { useState, useMemo } from 'react';
 import { ProductionRecord, PackingStockItem, StockTransaction } from '../types';
 import { getStockTransactions, saveStockTransaction } from '../services/storageService';
-import { Package, Plus, AlertTriangle, ArrowDown, Search, History } from 'lucide-react';
+import { Package, Plus, ArrowDown, Search, Calendar } from 'lucide-react';
+
+// --- Configuration ---
+// Records before this date will NOT be deducted from the Opening Stock.
+// This ensures the "Opening Stock" acts as the balance "As of Morning of Dec 10th".
+const STOCK_CALCULATION_START_DATE = '2025-12-10';
 
 // --- Master Data from Excel ---
 const MASTER_STOCK_LIST: PackingStockItem[] = [
@@ -51,6 +56,9 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
     const issuedMap = new Map<string, number>();
     
     records.forEach(r => {
+      // DATE FILTER: Ignore records before the stock take date
+      if (r.date < STOCK_CALCULATION_START_DATE) return;
+
       // Determine which Packing Material was used based on Product Name & Type
       const name = r.productName.toUpperCase();
       const isVacuum = name.includes('VACUUM') || name.includes('7018-1') || name.includes('7024'); // Simple heuristic
@@ -98,6 +106,8 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
     // 2. Calculate Inwards from Transactions
     const inwardMap = new Map<string, number>();
     transactions.forEach(t => {
+      // We also should probably filter inwards, but assume manual inwards are always relevant for now
+      // or filter if they have dates.
       const current = inwardMap.get(t.itemId) || 0;
       inwardMap.set(t.itemId, current + t.qty);
     });
@@ -151,7 +161,12 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
         </div>
         <div className="flex-1">
           <h2 className="text-xl font-bold text-gray-800">Packing Material Stock</h2>
-          <p className="text-sm text-gray-500">Live inventory tracking based on production data</p>
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+             <span>Tracking from:</span>
+             <span className="bg-gray-100 px-2 py-0.5 rounded font-mono text-gray-700 flex items-center gap-1">
+               <Calendar size={12} /> {STOCK_CALCULATION_START_DATE}
+             </span>
+          </div>
         </div>
         <div className="relative w-full md:w-64">
            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
