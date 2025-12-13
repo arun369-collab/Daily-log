@@ -24,7 +24,7 @@ const MASTER_STOCK_LIST: PackingStockItem[] = [
   // Cartons (PC)
   { id: 'PC1001', itemNo: '101458CC002', name: 'CARTON - 7018 - 80 X 28 X 470', openingStock: 0, unit: 'PCS', remark: 'Each Carton 60pcs', lowStockThreshold: 10 },
   { id: 'PC1002', itemNo: '101458CC001', name: 'CARTON - 7018 - 90 X 25 X 370', openingStock: 5376, unit: 'PCS', remark: 'Each Carton 50pcs' },
-  { id: 'PC1003', itemNo: '101458CC004', name: 'CARTON - 6013 - 70 X 22 X 370', openingStock: 12631, unit: 'PCS', remark: 'Each Carton 50pcs' },
+  { id: 'PC1003', itemNo: '101458CC004', name: 'CARTON - 6013 - 70 X 22 X 370', openingStock: 12631, unit: 'PCS', remark: 'F14 - Shared by 6013 & Ni Containers' },
   { id: 'PC1004', itemNo: '101458CC005', name: 'CARTON - 7018 - 70 X 22 X 470', openingStock: 7150, unit: 'PCS', remark: 'Each Carton 50pcs' },
   { id: 'PC1005', itemNo: '101458CC007', name: 'CARTON - VACCUM - 30.2X39X8', openingStock: 12732, unit: 'PCS', remark: 'Each Carton 50pcs' },
   { id: 'PC1006', itemNo: '101458CD001', name: 'CARTON - 6013 - 70 X 213 X 420 (20KG)', openingStock: 2250, unit: 'PCS', remark: 'Each Carton 50pcs' },
@@ -35,7 +35,7 @@ const MASTER_STOCK_LIST: PackingStockItem[] = [
 
   // Containers (PB)
   { id: 'PB1001', itemNo: '', name: 'Plastic container Silver colour NiFe', openingStock: 5793, unit: 'PCS', remark: 'Each Carton 500 box' },
-  { id: 'PB1002', itemNo: '', name: 'Plastic container Gold colour Ni', openingStock: 2620, unit: 'PCS', remark: 'Each Carton 666 box' }
+  { id: 'PB1002', itemNo: '', name: 'Plastic container Gold colour Ni', openingStock: 2620, unit: 'PCS', remark: 'F29 - Each Carton 666 box' }
 ];
 
 interface PackingStockProps {
@@ -56,24 +56,28 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
     const issuedMap = new Map<string, number>();
     
     records.forEach(r => {
-      // DATE FILTER: Ignore records before the stock take date
+      // DATE FILTER: Ignore records before the stock take date (Dec 10th)
       if (r.date < STOCK_CALCULATION_START_DATE) return;
 
       // Determine which Packing Material was used based on Product Name & Type
       const name = r.productName.toUpperCase();
-      const isVacuum = name.includes('VACUUM') || name.includes('7018-1') || name.includes('7024'); // Simple heuristic
+      
+      // Determine Type
+      // STRICT LOGIC: Only strictly VACUUM or 7024 are treated as Vacuum.
+      // SPARKWELD 7018-1 (Normal) MUST fall to the 'else' block.
+      const isVacuum = name.includes('VACUUM') || name.includes('7024'); 
       const is6013 = name.includes('6013');
       const isContainer = name.includes('CONTAINER') || name.includes('NI');
       
       let packetId = '';
       let cartonId = '';
       
-      // Logic mapping (Simplified based on prompt)
+      // Logic mapping
       if (is6013) {
         packetId = 'PD1001'; // Default 6013 Packet
-        cartonId = 'PC1003'; // Default 6013 Carton
+        cartonId = 'PC1003'; // Default 6013 Carton (F14)
       } else if (isVacuum) {
-        packetId = 'PD1006'; // Plain Vac-PACKETS
+        packetId = 'PD1006'; // Plain Vac-PACKETS (G9)
         cartonId = 'PC1005'; // CARTON - VACCUM
         
         // SPECIAL RULE: "Whatever number we enter in F9 (PD1006) same data we enter on F27 (VP1002)"
@@ -81,11 +85,18 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
         const currentFoil = issuedMap.get('VP1002') || 0;
         issuedMap.set('VP1002', currentFoil + r.duplesPkt);
       } else if (isContainer) {
-        // Handle containers if needed, e.g. PB1001
+        // Handle Containers
+        // NiFe -> Silver (PB1001)
+        // Ni   -> Gold (PB1002) [F29]
         packetId = name.includes('NIFE') ? 'PB1001' : 'PB1002';
-        cartonId = 'PC1003'; // Assume standard carton
+        
+        // SHARED RESOURCE RULE:
+        // Ni/NiFe products are packed in Containers (PacketID above)
+        // BUT they are placed inside 6013 Cartons (PC1003) [F14]
+        cartonId = 'PC1003'; 
       } else {
-        // Fallback for 7018 Normal
+        // Fallback for 7018 Normal, 7018-1 Normal, 8018 Normal
+        // Default to PD1002 (Main 7018 Packet) as primary default
         packetId = 'PD1002';
         cartonId = 'PC1002';
       }
@@ -106,8 +117,7 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
     // 2. Calculate Inwards from Transactions
     const inwardMap = new Map<string, number>();
     transactions.forEach(t => {
-      // We also should probably filter inwards, but assume manual inwards are always relevant for now
-      // or filter if they have dates.
+      // Inwards are manual additions, usually done AFTER stock take, so we assume they are valid
       const current = inwardMap.get(t.itemId) || 0;
       inwardMap.set(t.itemId, current + t.qty);
     });
