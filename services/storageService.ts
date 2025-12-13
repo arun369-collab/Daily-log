@@ -1,9 +1,10 @@
 
-import { ProductionRecord, SalesOrder, Customer } from '../types';
+import { ProductionRecord, SalesOrder, Customer, StockTransaction } from '../types';
 
 const STORAGE_KEY = 'factory_flow_data';
 const ORDERS_KEY = 'factory_flow_orders';
 const CUSTOMERS_KEY = 'factory_flow_customers';
+const STOCK_TXN_KEY = 'factory_flow_stock_txn';
 
 export const getRecords = (): ProductionRecord[] => {
   try {
@@ -128,12 +129,31 @@ export const deleteCustomer = (id: string): Customer[] => {
   return updated;
 };
 
+// --- Stock Transaction Functions ---
+
+export const getStockTransactions = (): StockTransaction[] => {
+  try {
+    const data = localStorage.getItem(STOCK_TXN_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch (e) {
+    return [];
+  }
+};
+
+export const saveStockTransaction = (txn: StockTransaction): StockTransaction[] => {
+  const current = getStockTransactions();
+  const updated = [txn, ...current];
+  localStorage.setItem(STOCK_TXN_KEY, JSON.stringify(updated));
+  return updated;
+};
+
 // --- Full State Import/Export for Cloud Sync ---
 
 export const getAllData = () => ({
   records: getRecords(),
   orders: getSalesOrders(),
   customers: getCustomers(),
+  stockTxns: getStockTransactions(),
   timestamp: Date.now()
 });
 
@@ -147,5 +167,8 @@ export const importData = (data: any) => {
   }
   if (data.customers && Array.isArray(data.customers)) {
     localStorage.setItem(CUSTOMERS_KEY, JSON.stringify(data.customers));
+  }
+  if (data.stockTxns && Array.isArray(data.stockTxns)) {
+    localStorage.setItem(STOCK_TXN_KEY, JSON.stringify(data.stockTxns));
   }
 };

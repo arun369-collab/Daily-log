@@ -69,6 +69,25 @@ export interface Customer {
   mapLink: string;
 }
 
-export type ViewState = 'dashboard' | 'entry' | 'history' | 'batches' | 'dispatch' | 'settings' | 'ledger_sheet' | 'sales_entry' | 'sales_dashboard' | 'customers';
+export interface PackingStockItem {
+  id: string; // e.g., PD1001
+  itemNo: string; // e.g., 101458CD004
+  name: string;
+  openingStock: number; // BF Qty
+  unit: 'PCS' | 'KG';
+  remark?: string;
+  lowStockThreshold?: number;
+}
+
+export interface StockTransaction {
+  id: string;
+  itemId: string;
+  date: string;
+  qty: number;
+  type: 'INWARD' | 'ADJUSTMENT';
+  notes?: string;
+}
+
+export type ViewState = 'dashboard' | 'entry' | 'history' | 'batches' | 'dispatch' | 'settings' | 'ledger_sheet' | 'sales_entry' | 'sales_dashboard' | 'customers' | 'packing_stock';
 
 export type UserRole = 'admin' | 'yadav' | 'sales';
