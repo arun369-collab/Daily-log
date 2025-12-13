@@ -7,7 +7,7 @@ import { Package, Plus, ArrowDown, Search, Calendar } from 'lucide-react';
 // --- Configuration ---
 // Records before this date will NOT be deducted from the Opening Stock.
 // This ensures the "Opening Stock" acts as the balance "As of Morning of Dec 10th".
-const STOCK_CALCULATION_START_DATE = '2025-12-10';
+const STOCK_CALCULATION_START_DATE = '2024-12-10';
 
 // --- Master Data from Excel ---
 const MASTER_STOCK_LIST: PackingStockItem[] = [
@@ -56,16 +56,21 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
     const issuedMap = new Map<string, number>();
     
     records.forEach(r => {
-      // DATE FILTER: Ignore records before the stock take date (Dec 10th)
+      // DATE FILTER: Ignore records before the stock take date
       if (r.date < STOCK_CALCULATION_START_DATE) return;
 
       // Determine which Packing Material was used based on Product Name & Type
       const name = r.productName.toUpperCase();
       
       // Determine Type
-      // STRICT LOGIC: Only strictly VACUUM or 7024 are treated as Vacuum.
-      // SPARKWELD 7018-1 (Normal) MUST fall to the 'else' block.
-      const isVacuum = name.includes('VACUUM') || name.includes('7024'); 
+      // STRICT LOGIC: 
+      // 1. "VACUUM" keyword -> PD1006 (G9) + PC1005 + Foil
+      // 2. "7024" -> PD1008 (Plain 460mm) + PC1002 (Standard) -> NOT G9
+      // 3. "6013" -> PD1001/PC1003
+      // 4. "Container" -> PB1001/PB1002 + PC1003
+      
+      const isVacuum = name.includes('VACUUM');
+      const is7024 = name.includes('7024');
       const is6013 = name.includes('6013');
       const isContainer = name.includes('CONTAINER') || name.includes('NI');
       
@@ -76,6 +81,11 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
       if (is6013) {
         packetId = 'PD1001'; // Default 6013 Packet
         cartonId = 'PC1003'; // Default 6013 Carton (F14)
+      } else if (is7024) {
+        // 7024 is usually 450mm, so it uses PD1008 (460mm Plain)
+        // It should NOT increase PD1006 (G9) usage
+        packetId = 'PD1008';
+        cartonId = 'PC1002'; // Assume standard 7018 carton or maybe Vacuum carton? Keeping safe with PC1002
       } else if (isVacuum) {
         packetId = 'PD1006'; // Plain Vac-PACKETS (G9)
         cartonId = 'PC1005'; // CARTON - VACCUM
