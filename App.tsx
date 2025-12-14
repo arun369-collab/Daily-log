@@ -18,7 +18,8 @@ import {
   RefreshCw,
   CheckCircle,
   AlertCircle,
-  Package
+  Package,
+  PieChart
 } from 'lucide-react';
 import { ViewState, ProductionRecord, UserRole, SalesOrder } from './types';
 import { getRecords, saveRecord, deleteRecord, getSalesOrders, saveSalesOrder, deleteSalesOrder, deleteSalesOrders } from './services/storageService';
@@ -35,6 +36,7 @@ import { SalesEntry } from './components/SalesEntry';
 import { SalesDashboard } from './components/SalesDashboard';
 import { CustomerDatabase } from './components/CustomerDatabase';
 import { PackingStock } from './components/PackingStock';
+import { VisualAnalytics } from './components/VisualAnalytics';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -254,7 +256,7 @@ function App() {
   // Permission Check Helper
   const canAccess = (feature: ViewState) => {
     if (userRole === 'admin') return true;
-    if (userRole === 'yadav') return ['dashboard', 'entry', 'ledger_sheet', 'packing_stock'].includes(feature);
+    if (userRole === 'yadav') return ['dashboard', 'entry', 'ledger_sheet', 'packing_stock', 'analytics'].includes(feature);
     if (userRole === 'sales') return ['sales_dashboard', 'sales_entry', 'customers'].includes(feature);
     return false;
   };
@@ -296,6 +298,8 @@ function App() {
 
         <nav className="space-y-2 flex-1">
           {canAccess('dashboard') && <NavItem target="dashboard" icon={LayoutDashboard} label="Dashboard" />}
+          {canAccess('analytics') && <NavItem target="analytics" icon={PieChart} label="Analytics" />}
+          
           {canAccess('entry') && <NavItem target="entry" icon={PlusCircle} label="Add Ledger Entry" />}
           {canAccess('ledger_sheet') && <NavItem target="ledger_sheet" icon={FileText} label="Daily Report" />}
           
@@ -339,6 +343,7 @@ function App() {
           <div>
             <h1 className="text-xl md:text-2xl font-bold text-gray-800">
               {view === 'dashboard' && 'Daily Summary'}
+              {view === 'analytics' && 'Visual Analytics'}
               {view === 'entry' && (editingRecord ? 'Edit Ledger Entry' : 'New Ledger Entry')}
               {view === 'packing_stock' && 'Packing Material Stock'}
               {view === 'batches' && 'Batch Registry'}
@@ -362,6 +367,7 @@ function App() {
 
         <div className="max-w-7xl mx-auto">
           {view === 'dashboard' && <Dashboard records={records} />}
+          {view === 'analytics' && <VisualAnalytics records={records} />}
           
           {view === 'entry' && (
             <DataEntry 
@@ -462,7 +468,7 @@ function App() {
            <>
              <MobileNavIcon target="dashboard" icon={LayoutDashboard} label="Home" />
              
-             {userRole === 'admin' && <MobileNavIcon target="sales_dashboard" icon={ShoppingBag} label="Orders" />}
+             {userRole === 'admin' && <MobileNavIcon target="analytics" icon={PieChart} label="Stats" />}
              {userRole === 'yadav' && <MobileNavIcon target="ledger_sheet" icon={FileText} label="Report" />}
              
              <div className="relative -top-6">
