@@ -61,7 +61,7 @@ export const VisualAnalytics: React.FC<VisualAnalyticsProps> = ({ records }) => 
     }, {});
 
     return Object.entries(grouped)
-      .map(([name, value]) => ({ name, value }))
+      .map(([name, value]) => ({ name, value: Number(value) }))
       .sort((a, b) => b.value - a.value);
   }, [filteredRecords]);
 
@@ -76,7 +76,7 @@ export const VisualAnalytics: React.FC<VisualAnalyticsProps> = ({ records }) => 
       return acc;
     }, {});
 
-    return Object.values(grouped)
+    return (Object.values(grouped) as ProductStats[])
       .filter((i) => i.rejected > 0)
       .sort((a, b) => b.rejected - a.rejected)
       .slice(0, 8); // Top 8
@@ -92,7 +92,7 @@ export const VisualAnalytics: React.FC<VisualAnalyticsProps> = ({ records }) => 
     }, {});
 
     return Object.entries(grouped)
-      .map(([name, value]) => ({ name, value }))
+      .map(([name, value]) => ({ name, value: Number(value) }))
       .sort((a, b) => b.value - a.value);
   }, [filteredRecords]);
 

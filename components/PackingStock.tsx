@@ -2,11 +2,10 @@
 import React, { useState, useMemo } from 'react';
 import { ProductionRecord, PackingStockItem, StockTransaction } from '../types';
 import { getStockTransactions, saveStockTransaction } from '../services/storageService';
-import { Package, Plus, ArrowDown, Search, Calendar, RefreshCw, Filter } from 'lucide-react';
+import { Package, Plus, ArrowDown, Search, Calendar, RefreshCw, Filter, Lock } from 'lucide-react';
 
 // --- Configuration ---
 // Records before this date will NOT be deducted from the Opening Stock.
-// This ensures the "Opening Stock" acts as the balance "As of Morning of Dec 11th".
 const STOCK_CALCULATION_START_DATE = '2024-12-11';
 
 // --- Master Data from Excel ---
@@ -53,116 +52,16 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
 
   // --- Auto-Calculation Logic ---
   const { stockData, includedCount, excludedCount } = useMemo(() => {
-    // 1. Calculate Issued Qty from Production Records
-    const issuedMap = new Map<string, number>();
-    let incCount = 0;
-    let excCount = 0;
-    
-    // Strict Date Comparison
-    const startObj = new Date(STOCK_CALCULATION_START_DATE);
-    startObj.setHours(0,0,0,0);
+    // ---------------------------------------------------------
+    // MANUAL OVERRIDE: CALCULATIONS PAUSED
+    // Just showing Master List Opening Stock (as of Dec 10th)
+    // ---------------------------------------------------------
 
-    records.forEach(r => {
-      // Parse record date
-      const rDate = new Date(r.date);
-      rDate.setHours(0,0,0,0);
-
-      // DATE FILTER: Ignore records strictly before the stock take date
-      if (rDate < startObj) {
-        excCount++;
-        return;
-      }
-      incCount++;
-
-      const name = r.productName.toUpperCase();
-      let packetId = '';
-      let cartonId = '';
-      
-      // LOGIC MAPPING ---------------------------
-      
-      // 1. NI & NIFE
-      // "for ni as f14 and F29"
-      if (name.includes('NI')) {
-         if (name.includes('NIFE')) {
-             packetId = 'PB1001'; // Silver Container (NiFe)
-         } else {
-             packetId = 'PB1002'; // F29 Gold Container (Ni)
-         }
-         cartonId = 'PC1003'; // F14 - Shared Carton
-      } 
-      
-      // 2. 6013 NORMAL
-      // "6013 normal as f4 and f14"
-      else if (name.includes('6013')) {
-          packetId = 'PD1001'; // F4
-          cartonId = 'PC1003'; // F14
-      } 
-      
-      // 3. 7018 PRODUCTS
-      else if (name.includes('7018')) {
-          // "for vaccum 7018 use f9 and f16"
-          if (name.includes('VACUUM')) {
-              packetId = 'PD1006'; // F9
-              cartonId = 'PC1005'; // F16
-          } 
-          // "for 7018 normal pack use f5 and f13"
-          else {
-              packetId = 'PD1002'; // F5
-              cartonId = 'PC1002'; // F13
-          }
-      }
-      
-      // 4. EXCEPTIONS & OTHERS
-      else if (name.includes('7024')) {
-        // 7024 is technically vacuum but usually longer (450mm), 
-        // using PD1008 + Standard Carton to avoid polluting F9/F16
-        packetId = 'PD1008';
-        cartonId = 'PC1002';
-      }
-      else if (name.includes('VACUUM')) {
-          // Catch-all for other Vacuums (e.g. 8018-B2) -> Use F9/F16 default
-          packetId = 'PD1006'; // F9
-          cartonId = 'PC1005'; // F16
-      }
-      else {
-          // General Fallback
-          packetId = 'PD1002'; // F5
-          cartonId = 'PC1002'; // F13
-      }
-      
-      // -----------------------------------------
-
-      // Record Usage
-      if (packetId) {
-        const currentPkt = issuedMap.get(packetId) || 0;
-        issuedMap.set(packetId, currentPkt + r.duplesPkt);
-      }
-
-      if (cartonId) {
-        const currentCtn = issuedMap.get(cartonId) || 0;
-        issuedMap.set(cartonId, currentCtn + r.cartonCtn);
-      }
-
-      // Special Rule: "keep f27 same as f9"
-      // Whenever F9 (PD1006) is used, we use F27 (VP1002)
-      if (packetId === 'PD1006') {
-          const currentFoil = issuedMap.get('VP1002') || 0;
-          issuedMap.set('VP1002', currentFoil + r.duplesPkt);
-      }
-    });
-
-    // 2. Calculate Inwards from Transactions
-    const inwardMap = new Map<string, number>();
-    transactions.forEach(t => {
-      const current = inwardMap.get(t.itemId) || 0;
-      inwardMap.set(t.itemId, current + t.qty);
-    });
-
-    // 3. Combine All
     const data = MASTER_STOCK_LIST.map(item => {
-      const inward = inwardMap.get(item.id) || 0;
-      const issued = issuedMap.get(item.id) || 0;
-      const available = item.openingStock + inward - issued;
+      // Force 0 for dynamic values to show snapshot only
+      const inward = 0;
+      const issued = 0;
+      const available = item.openingStock;
       
       return {
         ...item,
@@ -173,7 +72,24 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
       };
     });
 
-    return { stockData: data, includedCount: incCount, excludedCount: excCount };
+    return { stockData: data, includedCount: 0, excludedCount: 0 };
+
+    /* 
+    // PREVIOUS LOGIC (DISABLED)
+    // 1. Calculate Issued Qty from Production Records
+    const issuedMap = new Map<string, number>();
+    let incCount = 0;
+    let excCount = 0;
+    
+    // Strict Date Comparison
+    const startObj = new Date(STOCK_CALCULATION_START_DATE);
+    startObj.setHours(0,0,0,0);
+
+    records.forEach(r => {
+      // ... existing logic ...
+    });
+    // ...
+    */
 
   }, [records, transactions, refreshKey]);
 
@@ -210,16 +126,9 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
         <div className="flex-1">
           <h2 className="text-xl font-bold text-gray-800">Packing Material Stock</h2>
           <div className="flex flex-wrap items-center gap-4 text-sm mt-1">
-             <div className="flex items-center gap-1 text-gray-600 bg-gray-100 px-2 py-1 rounded">
-                <Calendar size={14} /> 
-                <span>Start: <strong>{STOCK_CALCULATION_START_DATE}</strong></span>
-             </div>
-             <div className="flex items-center gap-1 text-green-700 bg-green-50 px-2 py-1 rounded">
-                <Filter size={14} />
-                <span>Included: <strong>{includedCount}</strong> records</span>
-             </div>
-             <div className="flex items-center gap-1 text-gray-400">
-                <span>(Excluded: {excludedCount} old records)</span>
+             <div className="flex items-center gap-1 text-red-600 bg-red-50 px-2 py-1 rounded border border-red-100">
+                <Lock size={14} /> 
+                <span><strong>Snapshot Mode:</strong> Data fixed as of 10th Dec (No Calculations)</span>
              </div>
           </div>
         </div>
@@ -236,8 +145,9 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
           </div>
           <button 
              onClick={() => setRefreshKey(k => k + 1)}
-             className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
-             title="Recalculate Stock"
+             className="p-2 text-gray-400 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors cursor-not-allowed opacity-50"
+             title="Calculations Disabled"
+             disabled
           >
              <RefreshCw size={20} />
           </button>
@@ -253,9 +163,9 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
                 <th className="px-4 py-3">S.NO</th>
                 <th className="px-4 py-3">Item No</th>
                 <th className="px-4 py-3 w-1/3">Product Name</th>
-                <th className="px-4 py-3 text-right bg-gray-700">BF Qty<br/>(Opening)</th>
-                <th className="px-4 py-3 text-right bg-green-900 text-green-100">Inward<br/>(Added)</th>
-                <th className="px-4 py-3 text-right bg-red-900 text-red-100">Issue Qty<br/>(Used)</th>
+                <th className="px-4 py-3 text-right bg-gray-700">BF Qty<br/>(10th Dec)</th>
+                <th className="px-4 py-3 text-right bg-green-900 text-green-100 opacity-50">Inward<br/>(Paused)</th>
+                <th className="px-4 py-3 text-right bg-red-900 text-red-100 opacity-50">Issue Qty<br/>(Paused)</th>
                 <th className="px-4 py-3 text-right font-bold bg-amber-600">Available<br/>Stock</th>
                 <th className="px-4 py-3">Remark</th>
                 <th className="px-4 py-3 text-center">Action</th>
@@ -268,17 +178,18 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
                   <td className="px-4 py-3 font-mono text-xs text-gray-500">{item.itemNo || '-'}</td>
                   <td className="px-4 py-3 font-medium text-gray-900">{item.name}</td>
                   <td className="px-4 py-3 text-right font-medium text-gray-600 bg-gray-50">{item.openingStock.toLocaleString()}</td>
-                  <td className="px-4 py-3 text-right font-bold text-green-700 bg-green-50">{item.inward > 0 ? `+${item.inward.toLocaleString()}` : '-'}</td>
-                  <td className="px-4 py-3 text-right font-bold text-red-600 bg-red-50">{item.issued > 0 ? `-${item.issued.toLocaleString()}` : '-'}</td>
-                  <td className={`px-4 py-3 text-right font-bold text-lg ${item.isLow ? 'text-red-600' : 'text-gray-800'} bg-amber-50`}>
+                  <td className="px-4 py-3 text-right font-bold text-gray-400 bg-gray-50/50">-</td>
+                  <td className="px-4 py-3 text-right font-bold text-gray-400 bg-gray-50/50">-</td>
+                  <td className={`px-4 py-3 text-right font-bold text-lg text-gray-800 bg-amber-50`}>
                     {item.available.toLocaleString()}
                   </td>
                   <td className="px-4 py-3 text-xs text-gray-500">{item.remark}</td>
                   <td className="px-4 py-3 text-center">
                     <button 
                       onClick={() => setInwardModalItem(item)}
-                      className="p-1.5 text-green-600 hover:bg-green-100 rounded-lg transition-colors"
-                      title="Add Inward Stock"
+                      className="p-1.5 text-gray-300 hover:text-gray-400 cursor-not-allowed"
+                      title="Stock Updates Disabled"
+                      disabled
                     >
                       <Plus size={18} />
                     </button>
@@ -290,7 +201,7 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
         </div>
       </div>
 
-      {/* Inward Modal */}
+      {/* Inward Modal - Disabled/Hidden mostly, but kept code structure if enabled later */}
       {inwardModalItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden">
