@@ -64,54 +64,59 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
   // --- Logic to Map Production to Packaging Material ---
   const resolveMaterialIds = (record: ProductionRecord): { packetId: string | null, cartonId: string | null } => {
     // Determine Product Definition
-    // Reverse lookup or use name
     const def = PRODUCT_CATALOG.find(p => p.displayName === record.productName);
     
     // Default IDs
     let packetId: string | null = null;
     let cartonId: string | null = null;
 
-    if (!def) return { packetId, cartonId };
+    // Calculate approximate packet weight to distinguish variants
+    const approxPktWeight = record.duplesPkt > 0 ? (record.weightKg / record.duplesPkt) : 0;
 
     // --- PACKET MAPPING ---
-    if (def.type === 'Container') {
+    if (def?.type === 'Container') {
         if (def.family === 'Ni') packetId = 'PB1002'; // Gold
         if (def.family === 'NiFe') packetId = 'PB1001'; // Silver
-        // Cartons for Ni/NiFe? Usually shared PC1003 (F14 remark) but let's be careful.
-        // Remark for PC1003 says "Shared by 6013 & Ni Containers"
-        cartonId = 'PC1003';
+        cartonId = 'PC1003'; // Shared 6013 carton
     } 
-    else if (def.type === 'Vacuum') {
-        // Vacuum generally uses Foil Bags or specific Vac Packets?
-        // Master list has VP1001, VP1002, and PD1006 (Plain Vac Packets)
-        // Let's assume PD1006 for inner packet, VP1001 for foil?
-        // User didn't specify, but for now let's map Vacuum 7018/etc to Plain Vac if 2kg
-        const pktWeight = def.getPktWeight(record.size);
-        if (pktWeight === 2) packetId = 'PD1006'; // Plain Vac 2kg
-        
-        // Vacuum Carton
-        cartonId = 'PC1005';
+    else if (def?.type === 'Vacuum' || record.productName.toLowerCase().includes('vacuum')) {
+        // Vacuum Logic
+        if (approxPktWeight >= 1.5 && approxPktWeight <= 2.5) {
+             packetId = 'PD1006'; // Plain Vac 2kg
+        }
+        cartonId = 'PC1005'; // Vacuum Carton
     } 
     else {
         // --- NORMAL PACKETS (6013 / 7018) ---
-        const pktWeight = def.getPktWeight(record.size);
+        // We use the product family string check to be safer against slight name variations
         
-        if (def.family.includes('6013')) {
-           if (pktWeight === 2) packetId = 'PD1005'; // 6013 2kg
-           else if (pktWeight === 5) packetId = 'PD1007'; // 6013 5kg
-           else if (pktWeight === 4) packetId = 'PD1001'; // 6013 4kg
+        if (record.productName.includes('6013')) {
            cartonId = 'PC1003'; // 6013 Standard Carton
+           
+           // Packet Selection based on weight
+           if (approxPktWeight > 3.5 && approxPktWeight < 4.5) {
+             packetId = 'PD1001'; // 4kg
+           } else if (approxPktWeight > 1.5 && approxPktWeight < 2.5) {
+             packetId = 'PD1005'; // 2kg
+           } else if (approxPktWeight > 4.5) {
+             packetId = 'PD1007'; // 5kg
+           } else {
+             packetId = 'PD1001'; // Default to 4kg if unclear
+           }
         }
-        else if (def.family.includes('7018')) {
-           if (pktWeight === 5) packetId = 'PD1002'; // 7018 5kg
-           else if (pktWeight === 2.5) packetId = 'PD1004'; // 7018 2.5kg
+        else if (record.productName.includes('7018')) {
            cartonId = 'PC1002'; // 7018 Standard Carton
+           
+           // Packet Selection
+           if (approxPktWeight > 4.5) {
+             packetId = 'PD1002'; // 5kg
+           } else if (approxPktWeight > 2.0 && approxPktWeight < 3.0) {
+             packetId = 'PD1004'; // 2.5kg
+           } else {
+             packetId = 'PD1002'; // Default to 5kg
+           }
         }
     }
-
-    // Special Case: 20KG Carton (PC1006)
-    // If carton count is low and weight is high?
-    // Hard to detect without specific flag, keeping to standard mapping for now.
 
     return { packetId, cartonId };
   };
