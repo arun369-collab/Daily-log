@@ -18,6 +18,7 @@ import {
   RefreshCw,
   CheckCircle,
   AlertCircle,
+  Package,
   PieChart
 } from 'lucide-react';
 import { ViewState, ProductionRecord, UserRole, SalesOrder } from './types';
@@ -34,6 +35,7 @@ import { LedgerSheet } from './components/LedgerSheet';
 import { SalesEntry } from './components/SalesEntry';
 import { SalesDashboard } from './components/SalesDashboard';
 import { CustomerDatabase } from './components/CustomerDatabase';
+import { PackingStock } from './components/PackingStock';
 import { VisualAnalytics } from './components/VisualAnalytics';
 
 function App() {
@@ -254,7 +256,7 @@ function App() {
   // Permission Check Helper
   const canAccess = (feature: ViewState) => {
     if (userRole === 'admin') return true;
-    if (userRole === 'yadav') return ['dashboard', 'entry', 'ledger_sheet', 'analytics'].includes(feature);
+    if (userRole === 'yadav') return ['dashboard', 'entry', 'ledger_sheet', 'packing_stock', 'analytics'].includes(feature);
     if (userRole === 'sales') return ['sales_dashboard', 'sales_entry', 'customers'].includes(feature);
     return false;
   };
@@ -301,6 +303,7 @@ function App() {
           {canAccess('entry') && <NavItem target="entry" icon={PlusCircle} label="Add Ledger Entry" />}
           {canAccess('ledger_sheet') && <NavItem target="ledger_sheet" icon={FileText} label="Daily Report" />}
           
+          {canAccess('packing_stock') && <NavItem target="packing_stock" icon={Package} label="Packing Stock" />}
           {canAccess('batches') && <NavItem target="batches" icon={Archive} label="Batch Registry" />}
           {canAccess('dispatch') && <NavItem target="dispatch" icon={Truck} label="Dispatch Helper" />}
           {canAccess('history') && <NavItem target="history" icon={History} label="History" />}
@@ -342,6 +345,7 @@ function App() {
               {view === 'dashboard' && 'Daily Summary'}
               {view === 'analytics' && 'Visual Analytics'}
               {view === 'entry' && (editingRecord ? 'Edit Ledger Entry' : 'New Ledger Entry')}
+              {view === 'packing_stock' && 'Packing Material Stock'}
               {view === 'batches' && 'Batch Registry'}
               {view === 'ledger_sheet' && 'Daily Ledger Report'}
               {view === 'dispatch' && 'Dispatch Priority (FIFO)'}
@@ -373,6 +377,8 @@ function App() {
               initialData={editingRecord}
             />
           )}
+
+          {canAccess('packing_stock') && view === 'packing_stock' && <PackingStock records={records} />}
 
           {canAccess('batches') && view === 'batches' && <BatchRegistry records={records} />}
           
@@ -474,6 +480,7 @@ function App() {
                 </button>
              </div>
     
+             {userRole === 'admin' && <MobileNavIcon target="packing_stock" icon={Package} label="Stock" />}
              {userRole === 'yadav' && <MobileNavIcon target="batches" icon={Archive} label="Batches" />}
 
              {canAccess('history') && <MobileNavIcon target="history" icon={History} label="History" />}
