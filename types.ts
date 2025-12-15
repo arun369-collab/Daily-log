@@ -88,6 +88,6 @@ export interface StockTransaction {
   notes?: string;
 }
 
-export type ViewState = 'dashboard' | 'entry' | 'history' | 'batches' | 'dispatch' | 'settings' | 'ledger_sheet' | 'sales_entry' | 'sales_dashboard' | 'customers' | 'packing_stock' | 'analytics';
+export type ViewState = 'dashboard' | 'entry' | 'history' | 'batches' | 'dispatch' | 'settings' | 'ledger_sheet' | 'sales_entry' | 'sales_dashboard' | 'customers' | 'analytics';
 
 export type UserRole = 'admin' | 'yadav' | 'sales';
