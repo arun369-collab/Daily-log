@@ -67,6 +67,9 @@ export interface Customer {
   email: string;
   city: string;
   mapLink: string;
+  
+  // Order History
+  orderHistory?: string[];
 }
 
 export interface PackingStockItem {

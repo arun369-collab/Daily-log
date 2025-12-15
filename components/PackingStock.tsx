@@ -65,7 +65,9 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
   const resolveMaterialIds = (record: ProductionRecord): { packetId: string | null, cartonId: string | null } => {
     // Determine Product Definition
     const def = PRODUCT_CATALOG.find(p => p.displayName === record.productName);
-    
+    const prodName = record.productName.toUpperCase();
+    const size = record.size;
+
     // Default IDs
     let packetId: string | null = null;
     let cartonId: string | null = null;
@@ -79,18 +81,26 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
         if (def.family === 'NiFe') packetId = 'PB1001'; // Silver
         cartonId = 'PC1003'; // Shared 6013 carton
     } 
-    else if (def?.type === 'Vacuum' || record.productName.toLowerCase().includes('vacuum')) {
-        // Vacuum Logic
-        if (approxPktWeight >= 1.5 && approxPktWeight <= 2.5) {
-             packetId = 'PD1006'; // Plain Vac 2kg
+    else if (def?.type === 'Vacuum' || prodName.includes('VACUUM')) {
+        
+        // SPECIFIC RULE: Vacuum 7018 with 350mm length
+        // Logic: Packet = PD1006 (F9), Carton = PC1005 (F16)
+        if (prodName.includes('7018') && size.includes('350')) {
+             packetId = 'PD1006';
+             cartonId = 'PC1005';
+        } 
+        else {
+             // Fallback Vacuum Logic
+             if (approxPktWeight >= 1.5 && approxPktWeight <= 2.5) {
+                packetId = 'PD1006'; // Plain Vac 2kg
+             }
+             cartonId = 'PC1005'; // Vacuum Carton
         }
-        cartonId = 'PC1005'; // Vacuum Carton
     } 
     else {
         // --- NORMAL PACKETS (6013 / 7018) ---
-        // We use the product family string check to be safer against slight name variations
         
-        if (record.productName.includes('6013')) {
+        if (prodName.includes('6013')) {
            cartonId = 'PC1003'; // 6013 Standard Carton
            
            // Packet Selection based on weight
@@ -104,7 +114,7 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
              packetId = 'PD1001'; // Default to 4kg if unclear
            }
         }
-        else if (record.productName.includes('7018')) {
+        else if (prodName.includes('7018')) {
            cartonId = 'PC1002'; // 7018 Standard Carton
            
            // Packet Selection
@@ -152,6 +162,15 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
             if (pktItem) {
                 pktItem.issued += record.duplesPkt;
                 pktItem.available -= record.duplesPkt;
+            }
+
+            // SPECIAL RULE: F27 (VP1002) updates same as F9 (PD1006)
+            if (packetId === 'PD1006') {
+                 const foilItem = calculatedData.find(i => i.id === 'VP1002');
+                 if (foilItem) {
+                     foilItem.issued += record.duplesPkt;
+                     foilItem.available -= record.duplesPkt;
+                 }
             }
         }
 
