@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { ProductionRecord, PackingStockItem, StockTransaction } from '../types';
 import { getStockTransactions, saveStockTransaction } from '../services/storageService';
-import { Package, Plus, ArrowDown, Search, RefreshCw, Lock, AlertTriangle } from 'lucide-react';
+import { Package, Plus, ArrowDown, Search, RefreshCw, Lock, AlertTriangle, Info } from 'lucide-react';
 import { PRODUCT_CATALOG } from '../data/products';
 
 // --- Configuration ---
@@ -48,6 +48,12 @@ const MASTER_STOCK_LIST: PackingStockItem[] = [
   { id: 'PB1002', itemNo: '', name: 'Plastic container Gold colour Ni', openingStock: 2827, unit: 'PCS', remark: 'Each Carton 666 box (F29)' }
 ];
 
+interface BreakdownItem {
+  date: string;
+  batch: string;
+  qty: number;
+}
+
 interface PackingStockProps {
   records: ProductionRecord[];
 }
@@ -57,6 +63,14 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
   const [inwardModalItem, setInwardModalItem] = useState<PackingStockItem | null>(null);
   const [inwardQty, setInwardQty] = useState('');
   const [refreshKey, setRefreshKey] = useState(0); 
+  
+  // Tooltip State
+  const [hoveredBreakdown, setHoveredBreakdown] = useState<{
+    x: number;
+    y: number;
+    data: BreakdownItem[];
+    itemName: string;
+  } | null>(null);
   
   // Transactions State
   const [transactions, setTransactions] = useState<StockTransaction[]>(getStockTransactions());
@@ -145,7 +159,8 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
       ...item,
       inward: 0,
       issued: 0,
-      available: item.openingStock
+      available: item.openingStock,
+      breakdown: [] as BreakdownItem[] // Track issue sources
     }));
 
     // 2. Process Inward Transactions (Manual)
@@ -169,6 +184,11 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
             if (pktItem) {
                 pktItem.issued += record.duplesPkt;
                 pktItem.available -= record.duplesPkt;
+                pktItem.breakdown.push({
+                  date: record.date,
+                  batch: record.batchNo,
+                  qty: record.duplesPkt
+                });
             }
 
             // SPECIAL RULE: F27 (VP1002) updates same as F9 (PD1006)
@@ -177,6 +197,11 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
                  if (foilItem) {
                      foilItem.issued += record.duplesPkt;
                      foilItem.available -= record.duplesPkt;
+                     foilItem.breakdown.push({
+                       date: record.date,
+                       batch: record.batchNo,
+                       qty: record.duplesPkt
+                     });
                  }
             }
         }
@@ -187,6 +212,11 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
             if (ctnItem) {
                 ctnItem.issued += record.cartonCtn;
                 ctnItem.available -= record.cartonCtn;
+                ctnItem.breakdown.push({
+                  date: record.date,
+                  batch: record.batchNo,
+                  qty: record.cartonCtn
+                });
             }
         }
     });
@@ -265,7 +295,7 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
       </div>
 
       {/* Stock Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden relative">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="bg-gray-800 text-white uppercase text-xs">
@@ -294,7 +324,20 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
                   <td className="px-4 py-3 text-right font-bold text-green-600 bg-green-50/30">
                      {item.inward > 0 ? item.inward.toLocaleString() : '-'}
                   </td>
-                  <td className="px-4 py-3 text-right font-bold text-red-600 bg-red-50/30">
+                  <td 
+                    className="px-4 py-3 text-right font-bold text-red-600 bg-red-50/30 cursor-pointer hover:bg-red-100 transition-colors relative"
+                    onMouseEnter={(e) => {
+                       if (item.issued <= 0) return;
+                       const rect = e.currentTarget.getBoundingClientRect();
+                       setHoveredBreakdown({
+                           x: rect.right,
+                           y: rect.top,
+                           data: item.breakdown,
+                           itemName: item.name
+                       });
+                    }}
+                    onMouseLeave={() => setHoveredBreakdown(null)}
+                  >
                      {item.issued > 0 ? item.issued.toLocaleString() : '-'}
                   </td>
                   <td className={`px-4 py-3 text-right font-bold text-lg ${item.isLow ? 'text-red-600' : 'text-gray-800'} bg-amber-50`}>
@@ -316,6 +359,49 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
           </table>
         </div>
       </div>
+
+      {/* Floating Breakdown Tooltip */}
+      {hoveredBreakdown && (
+        <div 
+          className="fixed z-50 bg-white shadow-xl border border-gray-200 rounded-lg p-0 w-72 text-sm pointer-events-none overflow-hidden animate-fadeIn"
+          style={{ 
+            top: hoveredBreakdown.y - 20, // Slightly offset up
+            left: hoveredBreakdown.x - 300, // Show to the left of the cursor
+          }}
+        >
+          <div className="bg-gray-100 px-3 py-2 border-b border-gray-200 font-bold text-gray-700 text-xs flex justify-between items-center">
+             <span className="truncate max-w-[180px]">{hoveredBreakdown.itemName}</span>
+             <span className="bg-red-100 text-red-700 px-1.5 py-0.5 rounded border border-red-200">
+               Issued Breakdown
+             </span>
+          </div>
+          <div className="max-h-64 overflow-y-auto">
+             <table className="w-full text-xs">
+                <thead className="bg-gray-50 text-gray-500 sticky top-0">
+                   <tr>
+                      <th className="px-3 py-1 text-left font-medium">Date</th>
+                      <th className="px-2 py-1 text-left font-medium">Batch</th>
+                      <th className="px-3 py-1 text-right font-medium">Qty</th>
+                   </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                   {hoveredBreakdown.data
+                     .sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                     .map((entry, idx) => (
+                      <tr key={idx}>
+                         <td className="px-3 py-1 text-gray-600 whitespace-nowrap">{entry.date}</td>
+                         <td className="px-2 py-1 font-mono text-gray-800">{entry.batch}</td>
+                         <td className="px-3 py-1 text-right font-bold text-red-600">{entry.qty}</td>
+                      </tr>
+                   ))}
+                </tbody>
+             </table>
+          </div>
+          <div className="bg-gray-50 px-3 py-2 border-t border-gray-200 text-right text-xs font-bold text-gray-800">
+             Total: {hoveredBreakdown.data.reduce((acc, curr) => acc + curr.qty, 0).toLocaleString()}
+          </div>
+        </div>
+      )}
 
       {/* Inward Modal */}
       {inwardModalItem && (
