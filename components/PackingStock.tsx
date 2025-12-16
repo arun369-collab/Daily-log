@@ -12,21 +12,21 @@ const STOCK_CALCULATION_START_DATE = '2024-12-01';
 // --- Master Data (Opening Balance as of Nov 30th) ---
 const MASTER_STOCK_LIST: PackingStockItem[] = [
   // Packets (PD)
-  { id: 'PD1001', itemNo: '101458CD004', name: 'PACKETS 6013 - 50 X 70 X 360', openingStock: 30974, unit: 'PCS', remark: 'Each Carton 300pcs 4.0kg' },
+  { id: 'PD1001', itemNo: '101458CD004', name: 'PACKETS 6013 - 50 X 70 X 360', openingStock: 30974, unit: 'PCS', remark: 'Each Carton 300pcs 4.0kg (F4)' },
   { id: 'PD1002', itemNo: '2700011918', name: 'PACKETS 7018 - 60 X 75 X 360 (5.0 KG)', openingStock: 6581, unit: 'PCS', remark: 'Each Carton 350pcs 5.0kg' },
   { id: 'PD1003', itemNo: '', name: 'PACKETS 7018 - 50 X 75 X 460', openingStock: 11193, unit: 'PCS', remark: 'Each Carton 200pcs 5.0kg' },
   { id: 'PD1004', itemNo: '101458CD003', name: 'PACKETS 7018 - 40 X 60 X 360 (2.5 KG)', openingStock: 16500, unit: 'PCS', remark: 'Each Carton 300pcs 2.5kg' },
   { id: 'PD1005', itemNo: '101458CD005', name: 'PACKETS 6013 - 50 X 3.5 X 360', openingStock: 46011, unit: 'PCS', remark: 'Each Carton 375pcs 2.0kg' },
-  { id: 'PD1006', itemNo: '101458CD005', name: 'PLAIN Vac-PACKETS - 50 X 3.5 X 360', openingStock: 15616, unit: 'PCS', remark: 'Each Carton 300pcs 2.0kg' },
+  { id: 'PD1006', itemNo: '101458CD005', name: 'PLAIN Vac-PACKETS - 50 X 3.5 X 360', openingStock: 15616, unit: 'PCS', remark: 'Each Carton 300pcs 2.0kg (F9)' },
   { id: 'PD1007', itemNo: '101458CD006', name: 'PACKETS 6013 - 50 X 65 X 400', openingStock: 6785, unit: 'PCS', remark: 'Each Carton 250pcs 5.0kg' },
   { id: 'PD1008', itemNo: '', name: 'PLAIN PACKETS - 50 X 70 X 460', openingStock: 5700, unit: 'PCS', remark: 'Each Carton 200pcs 5.0kg' },
   
   // Cartons (PC)
   { id: 'PC1001', itemNo: '101458CC002', name: 'CARTON - 7018 - 80 X 28 X 470', openingStock: 0, unit: 'PCS', remark: 'Each Carton 60pcs' },
   { id: 'PC1002', itemNo: '101458CC001', name: 'CARTON - 7018 - 90 X 25 X 370', openingStock: 5678, unit: 'PCS', remark: 'Each Carton 50pcs' },
-  { id: 'PC1003', itemNo: '101458CC004', name: 'CARTON - 6013 - 70 X 22 X 370', openingStock: 13229, unit: 'PCS', remark: 'Each Carton 50pcs' },
+  { id: 'PC1003', itemNo: '101458CC004', name: 'CARTON - 6013 - 70 X 22 X 370', openingStock: 13229, unit: 'PCS', remark: 'Each Carton 50pcs (F14)' },
   { id: 'PC1004', itemNo: '101458CC005', name: 'CARTON - 7018 - 70 X 22 X 470', openingStock: 7150, unit: 'PCS', remark: 'Each Carton 50pcs' },
-  { id: 'PC1005', itemNo: '101458CC007', name: 'CARTON - VACCUM - 30.2X39X8', openingStock: 13019, unit: 'PCS', remark: 'Each Carton 50pcs' },
+  { id: 'PC1005', itemNo: '101458CC007', name: 'CARTON - VACCUM - 30.2X39X8', openingStock: 13019, unit: 'PCS', remark: 'Each Carton 50pcs (F16)' },
   { id: 'PC1006', itemNo: '101458CD001', name: 'CARTON - 6013 - 70 X 213 X 420 (20KG)', openingStock: 2250, unit: 'PCS', remark: 'Each Carton 50pcs' },
 
   // New Plastic Items (PP)
@@ -41,11 +41,11 @@ const MASTER_STOCK_LIST: PackingStockItem[] = [
 
   // Vacuum Foil (VP)
   { id: 'VP1001', itemNo: '', name: 'VACUUM FOIL BAG 20K pcs', openingStock: 18700, unit: 'PCS', remark: '' },
-  { id: 'VP1002', itemNo: '', name: 'VACUUM Aluminium FOIL BAG 20K pcs', openingStock: 0, unit: 'PCS', remark: 'Each Carton 1200 bags' },
+  { id: 'VP1002', itemNo: '', name: 'VACUUM Aluminium FOIL BAG 20K pcs', openingStock: 0, unit: 'PCS', remark: 'Each Carton 1200 bags (F27)' },
 
   // Containers (PB)
   { id: 'PB1001', itemNo: '', name: 'Plastic container Silver colour NiFe', openingStock: 5793, unit: 'PCS', remark: 'Each Carton 500 box' },
-  { id: 'PB1002', itemNo: '', name: 'Plastic container Gold colour Ni', openingStock: 2827, unit: 'PCS', remark: 'Each Carton 666 box' }
+  { id: 'PB1002', itemNo: '', name: 'Plastic container Gold colour Ni', openingStock: 2827, unit: 'PCS', remark: 'Each Carton 666 box (F29)' }
 ];
 
 interface PackingStockProps {
@@ -76,10 +76,17 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
     const approxPktWeight = record.duplesPkt > 0 ? (record.weightKg / record.duplesPkt) : 0;
 
     // --- PACKET MAPPING ---
-    if (def?.type === 'Container') {
-        if (def.family === 'Ni') packetId = 'PB1002'; // Gold
-        if (def.family === 'NiFe') packetId = 'PB1001'; // Silver
-        cartonId = 'PC1003'; // Shared 6013 carton
+    if (def?.type === 'Container' || prodName.includes('SPARKWELD NI')) {
+        // Ni (Gold) -> F29 (PB1002)
+        // NiFe (Silver) -> (PB1001)
+        if (def?.family === 'Ni' || prodName === 'SPARKWELD NI') {
+             packetId = 'PB1002'; // Gold (F29)
+        } else if (def?.family === 'NiFe' || prodName === 'SPARKWELD NIFE') {
+             packetId = 'PB1001'; // Silver
+        }
+        
+        // Both use F14 (6013 Carton / PC1003)
+        cartonId = 'PC1003'; 
     } 
     else if (def?.type === 'Vacuum' || prodName.includes('VACUUM')) {
         
@@ -92,20 +99,20 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
         else {
              // Fallback Vacuum Logic
              if (approxPktWeight >= 1.5 && approxPktWeight <= 2.5) {
-                packetId = 'PD1006'; // Plain Vac 2kg
+                packetId = 'PD1006'; // Plain Vac 2kg (F9)
              }
-             cartonId = 'PC1005'; // Vacuum Carton
+             cartonId = 'PC1005'; // Vacuum Carton (F16)
         }
     } 
     else {
         // --- NORMAL PACKETS (6013 / 7018) ---
         
         if (prodName.includes('6013')) {
-           cartonId = 'PC1003'; // 6013 Standard Carton
+           cartonId = 'PC1003'; // 6013 Standard Carton (F14)
            
            // Packet Selection based on weight
            if (approxPktWeight > 3.5 && approxPktWeight < 4.5) {
-             packetId = 'PD1001'; // 4kg
+             packetId = 'PD1001'; // 4kg (F4)
            } else if (approxPktWeight > 1.5 && approxPktWeight < 2.5) {
              packetId = 'PD1005'; // 2kg
            } else if (approxPktWeight > 4.5) {
