@@ -70,6 +70,7 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
     y: number;
     data: BreakdownItem[];
     itemName: string;
+    type: 'INWARD' | 'ISSUE';
   } | null>(null);
   
   // Transactions State
@@ -160,7 +161,8 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
       inward: 0,
       issued: 0,
       available: item.openingStock,
-      breakdown: [] as BreakdownItem[] // Track issue sources
+      breakdown: [] as BreakdownItem[], // Track issue sources
+      inwardBreakdown: [] as BreakdownItem[] // Track inward sources
     }));
 
     // 2. Process Inward Transactions (Manual)
@@ -169,6 +171,11 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
         if (item) {
             item.inward += txn.qty;
             item.available += txn.qty;
+            item.inwardBreakdown.push({
+              date: txn.date,
+              batch: txn.notes || 'Manual Add',
+              qty: txn.qty
+            });
         }
     });
 
@@ -321,7 +328,21 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
                     {item.isLow && <span className="ml-2 inline-flex text-xs text-red-600 font-bold"><AlertTriangle size={12} /> Low</span>}
                   </td>
                   <td className="px-4 py-3 text-right font-medium text-gray-600 bg-gray-50">{item.openingStock.toLocaleString()}</td>
-                  <td className="px-4 py-3 text-right font-bold text-green-600 bg-green-50/30">
+                  <td 
+                    className="px-4 py-3 text-right font-bold text-green-600 bg-green-50/30 cursor-pointer hover:bg-green-100 transition-colors relative"
+                    onMouseEnter={(e) => {
+                       if (item.inward <= 0) return;
+                       const rect = e.currentTarget.getBoundingClientRect();
+                       setHoveredBreakdown({
+                           x: rect.right,
+                           y: rect.top,
+                           data: item.inwardBreakdown,
+                           itemName: item.name,
+                           type: 'INWARD'
+                       });
+                    }}
+                    onMouseLeave={() => setHoveredBreakdown(null)}
+                  >
                      {item.inward > 0 ? item.inward.toLocaleString() : '-'}
                   </td>
                   <td 
@@ -333,7 +354,8 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
                            x: rect.right,
                            y: rect.top,
                            data: item.breakdown,
-                           itemName: item.name
+                           itemName: item.name,
+                           type: 'ISSUE'
                        });
                     }}
                     onMouseLeave={() => setHoveredBreakdown(null)}
@@ -370,9 +392,13 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
           }}
         >
           <div className="bg-gray-100 px-3 py-2 border-b border-gray-200 font-bold text-gray-700 text-xs flex justify-between items-center">
-             <span className="truncate max-w-[180px]">{hoveredBreakdown.itemName}</span>
-             <span className="bg-red-100 text-red-700 px-1.5 py-0.5 rounded border border-red-200">
-               Issued Breakdown
+             <span className="truncate max-w-[170px]">{hoveredBreakdown.itemName}</span>
+             <span className={`px-1.5 py-0.5 rounded border ${
+               hoveredBreakdown.type === 'INWARD' 
+                 ? 'bg-green-100 text-green-700 border-green-200'
+                 : 'bg-red-100 text-red-700 border-red-200'
+             }`}>
+               {hoveredBreakdown.type === 'INWARD' ? 'Inward History' : 'Issued Breakdown'}
              </span>
           </div>
           <div className="max-h-64 overflow-y-auto">
@@ -380,7 +406,7 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
                 <thead className="bg-gray-50 text-gray-500 sticky top-0">
                    <tr>
                       <th className="px-3 py-1 text-left font-medium">Date</th>
-                      <th className="px-2 py-1 text-left font-medium">Batch</th>
+                      <th className="px-2 py-1 text-left font-medium">{hoveredBreakdown.type === 'INWARD' ? 'Ref/Notes' : 'Batch'}</th>
                       <th className="px-3 py-1 text-right font-medium">Qty</th>
                    </tr>
                 </thead>
@@ -391,7 +417,7 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
                       <tr key={idx}>
                          <td className="px-3 py-1 text-gray-600 whitespace-nowrap">{entry.date}</td>
                          <td className="px-2 py-1 font-mono text-gray-800">{entry.batch}</td>
-                         <td className="px-3 py-1 text-right font-bold text-red-600">{entry.qty}</td>
+                         <td className={`px-3 py-1 text-right font-bold ${hoveredBreakdown.type === 'INWARD' ? 'text-green-600' : 'text-red-600'}`}>{entry.qty}</td>
                       </tr>
                    ))}
                 </tbody>
