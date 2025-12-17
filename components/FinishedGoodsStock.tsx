@@ -1,6 +1,12 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Warehouse, Calendar, Download, Search } from 'lucide-react';
+import { ProductionRecord, SalesOrder } from '../types';
+
+interface FinishedGoodsStockProps {
+  records?: ProductionRecord[];
+  orders?: SalesOrder[];
+}
 
 // Master Data provided (Opening Balance as of Nov 30)
 const MASTER_FINISHED_GOODS = [
@@ -57,20 +63,55 @@ const MASTER_FINISHED_GOODS = [
   { product: 'VACUUM 8018-G', size: '4.0 x 350', opening: 284 },
 ];
 
-export const FinishedGoodsStock: React.FC = () => {
+export const FinishedGoodsStock: React.FC<FinishedGoodsStockProps> = ({ records = [], orders = [] }) => {
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Currently, dynamic calculation is disabled as per user request.
-  // We strictly show Opening Stock (Nov 30) and placeholders for others.
-  const tableData = MASTER_FINISHED_GOODS.map(item => ({
-    ...item,
-    production: 0,
-    return: 0,
-    despatch: 0,
-    // Stock is essentially Opening + Production + Return - Despatch
-    // Since others are 0, Stock = Opening for now.
-    currentStock: item.opening 
-  }));
+  // Helper to normalize strings for comparison (remove spaces, lowercase)
+  const normalize = (str: string) => str.toLowerCase().replace(/\s/g, '');
+
+  const tableData = useMemo(() => {
+    return MASTER_FINISHED_GOODS.map(item => {
+      const normName = normalize(item.product);
+      const normSize = normalize(item.size);
+
+      // 1. Production (from records, !isReturn)
+      const productionQty = records
+        .filter(r => 
+          normalize(r.productName) === normName && 
+          normalize(r.size) === normSize && 
+          !r.isReturn
+        )
+        .reduce((sum, r) => sum + r.weightKg, 0);
+
+      // 2. Returns (from records, isReturn)
+      const returnQty = records
+        .filter(r => 
+          normalize(r.productName) === normName && 
+          normalize(r.size) === normSize && 
+          r.isReturn
+        )
+        .reduce((sum, r) => sum + r.weightKg, 0);
+
+      // 3. Despatch (from sales orders, status dispatched/delivered)
+      // Note: Orders might not be fully wired to this yet, but we put the logic in.
+      const despatchQty = orders
+        .filter(o => o.status === 'Dispatched' || o.status === 'Delivered')
+        .reduce((orderSum, order) => {
+           const itemTotal = order.items
+             .filter(i => normalize(i.productName) === normName && normalize(i.size) === normSize)
+             .reduce((iSum, i) => iSum + i.calculatedWeightKg, 0);
+           return orderSum + itemTotal;
+        }, 0);
+
+      return {
+        ...item,
+        production: productionQty,
+        return: returnQty,
+        despatch: despatchQty,
+        currentStock: item.opening + productionQty + returnQty - despatchQty
+      };
+    });
+  }, [records, orders]);
 
   const filteredData = tableData.filter(item => 
     item.product.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -78,10 +119,14 @@ export const FinishedGoodsStock: React.FC = () => {
   );
 
   const totalOpening = filteredData.reduce((acc, curr) => acc + curr.opening, 0);
+  const totalProduction = filteredData.reduce((acc, curr) => acc + curr.production, 0);
+  const totalReturn = filteredData.reduce((acc, curr) => acc + curr.return, 0);
+  const totalDespatch = filteredData.reduce((acc, curr) => acc + curr.despatch, 0);
+  const totalStock = filteredData.reduce((acc, curr) => acc + curr.currentStock, 0);
 
   const handleExport = () => {
     // Basic CSV Export
-    const headers = ["Product", "Size", "Available Qty/kgs (Nov 30)", "Production", "Return", "Despatch", "Stock/kgs"];
+    const headers = ["Product", "Size", "Available Qty/kgs (Opening)", "Production", "Return", "Despatch", "Stock/kgs"];
     const rows = filteredData.map(r => [
       `"${r.product}"`,
       r.size,
@@ -112,7 +157,7 @@ export const FinishedGoodsStock: React.FC = () => {
           </div>
           <div>
             <h2 className="text-xl font-bold text-gray-800">Finished Goods Stock</h2>
-            <p className="text-sm text-gray-500">Inventory Status as of Nov 30 (Opening)</p>
+            <p className="text-sm text-gray-500">Live Inventory (Opening as of Nov 30)</p>
           </div>
         </div>
 
@@ -130,6 +175,7 @@ export const FinishedGoodsStock: React.FC = () => {
            <button 
              onClick={handleExport}
              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm font-medium"
+             title="Export CSV"
            >
              <Download size={18} /> <span className="hidden md:inline">Export</span>
            </button>
@@ -147,7 +193,7 @@ export const FinishedGoodsStock: React.FC = () => {
         {/* Date Row */}
         <div className="bg-white border-b border-black flex justify-end px-4 py-1">
           <div className="bg-yellow-300 border border-black px-4 py-1 font-bold text-black flex items-center gap-2">
-             Date: 01/12/2025
+             Date: {new Date().toLocaleDateString('en-GB')}
           </div>
         </div>
 
@@ -176,12 +222,23 @@ export const FinishedGoodsStock: React.FC = () => {
                     <td className="border border-black px-3 py-1 text-right font-bold bg-[#e2efda] text-black">
                       {row.opening.toLocaleString()}
                     </td>
-                    {/* Placeholder Columns */}
-                    <td className="border border-black px-3 py-1 text-right bg-[#e2efda] text-gray-400">-</td>
-                    <td className="border border-black px-3 py-1 text-right bg-[#e2efda] text-gray-400">-</td>
-                    <td className="border border-black px-3 py-1 text-right bg-[#e2efda] text-gray-400">-</td>
                     
-                    {/* Closing Stock (Currently equals Opening) */}
+                    {/* Live Production */}
+                    <td className={`border border-black px-3 py-1 text-right bg-[#e2efda] ${row.production > 0 ? 'text-blue-700 font-bold' : 'text-gray-400'}`}>
+                      {row.production > 0 ? row.production.toLocaleString() : '-'}
+                    </td>
+                    
+                    {/* Live Return */}
+                    <td className={`border border-black px-3 py-1 text-right bg-[#e2efda] ${row.return > 0 ? 'text-orange-600 font-bold' : 'text-gray-400'}`}>
+                      {row.return > 0 ? row.return.toLocaleString() : '-'}
+                    </td>
+                    
+                    {/* Live Despatch */}
+                    <td className={`border border-black px-3 py-1 text-right bg-[#e2efda] ${row.despatch > 0 ? 'text-red-700 font-bold' : 'text-gray-400'}`}>
+                      {row.despatch > 0 ? row.despatch.toLocaleString() : '-'}
+                    </td>
+                    
+                    {/* Closing Stock */}
                     <td className="border border-black px-3 py-1 text-right font-bold bg-[#e2efda] text-black">
                        {row.currentStock.toLocaleString()}
                     </td>
@@ -189,13 +246,13 @@ export const FinishedGoodsStock: React.FC = () => {
                ))}
                
                {/* Total Row */}
-               <tr className="bg-yellow-100 font-bold border-t-2 border-black">
-                  <td className="border border-black px-3 py-2 text-right" colSpan={2}>Total Opening Stock:</td>
+               <tr className="bg-yellow-100 font-bold border-t-2 border-black text-black">
+                  <td className="border border-black px-3 py-2 text-right" colSpan={2}>Total:</td>
                   <td className="border border-black px-3 py-2 text-right">{totalOpening.toLocaleString()}</td>
-                  <td className="border border-black px-3 py-2 bg-gray-100"></td>
-                  <td className="border border-black px-3 py-2 bg-gray-100"></td>
-                  <td className="border border-black px-3 py-2 bg-gray-100"></td>
-                  <td className="border border-black px-3 py-2 text-right">{totalOpening.toLocaleString()}</td>
+                  <td className="border border-black px-3 py-2 text-right text-blue-700">{totalProduction.toLocaleString()}</td>
+                  <td className="border border-black px-3 py-2 text-right text-orange-600">{totalReturn.toLocaleString()}</td>
+                  <td className="border border-black px-3 py-2 text-right text-red-700">{totalDespatch.toLocaleString()}</td>
+                  <td className="border border-black px-3 py-2 text-right">{totalStock.toLocaleString()}</td>
                </tr>
             </tbody>
           </table>

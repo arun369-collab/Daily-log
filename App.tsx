@@ -390,7 +390,7 @@ function App() {
 
           {canAccess('packing_stock') && view === 'packing_stock' && <PackingStock records={records} />}
 
-          {canAccess('finished_goods') && view === 'finished_goods' && <FinishedGoodsStock />}
+          {canAccess('finished_goods') && view === 'finished_goods' && <FinishedGoodsStock records={records} orders={salesOrders} />}
 
           {canAccess('batches') && view === 'batches' && <BatchRegistry records={records} />}
           

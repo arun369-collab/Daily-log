@@ -147,6 +147,13 @@ export const saveStockTransaction = (txn: StockTransaction): StockTransaction[] 
   return updated;
 };
 
+export const deleteStockTransaction = (id: string): StockTransaction[] => {
+  const current = getStockTransactions();
+  const updated = current.filter(t => t.id !== id);
+  localStorage.setItem(STOCK_TXN_KEY, JSON.stringify(updated));
+  return updated;
+};
+
 // --- Full State Import/Export for Cloud Sync ---
 
 export const getAllData = () => ({

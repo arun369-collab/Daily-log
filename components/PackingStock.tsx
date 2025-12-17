@@ -1,9 +1,9 @@
 
-// ... (Imports remain same)
+// ... (Imports)
 import React, { useState, useMemo } from 'react';
 import { ProductionRecord, PackingStockItem, StockTransaction } from '../types';
-import { getStockTransactions, saveStockTransaction } from '../services/storageService';
-import { Package, Plus, ArrowDown, Search, RefreshCw, Lock, AlertTriangle, Info, Calendar } from 'lucide-react';
+import { getStockTransactions, saveStockTransaction, deleteStockTransaction } from '../services/storageService';
+import { Package, Plus, ArrowDown, Search, RefreshCw, Lock, AlertTriangle, Info, Calendar, History, Trash2, X } from 'lucide-react';
 import { PRODUCT_CATALOG } from '../data/products';
 
 // ... (Configuration and Master Data remain exactly same as previous state)
@@ -64,6 +64,7 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
   const [inwardQty, setInwardQty] = useState('');
   const [inwardDate, setInwardDate] = useState(new Date().toISOString().split('T')[0]);
   const [refreshKey, setRefreshKey] = useState(0); 
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
   
   // Tooltip State
   const [hoveredBreakdown, setHoveredBreakdown] = useState<{
@@ -260,6 +261,13 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
     setInwardDate(new Date().toISOString().split('T')[0]);
   };
 
+  const handleDeleteTransaction = (id: string) => {
+    if (window.confirm("Are you sure you want to delete this inward entry?")) {
+        const updated = deleteStockTransaction(id);
+        setTransactions(updated);
+    }
+  };
+
   const filteredStock = stockData.filter(s => 
     s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     s.id.toLowerCase().includes(searchTerm.toLowerCase())
@@ -296,6 +304,13 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg w-full outline-none focus:ring-2 focus:ring-amber-500"
              />
           </div>
+          <button 
+             onClick={() => setShowHistoryModal(true)}
+             className="flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-lg transition-colors font-medium text-sm"
+             title="View & Delete Inward Entries"
+          >
+             <History size={18} /> Log
+          </button>
           <button 
              onClick={() => setRefreshKey(k => k + 1)}
              className="p-2 text-gray-500 hover:text-blue-600 bg-gray-50 hover:bg-blue-50 rounded-lg transition-colors"
@@ -506,6 +521,73 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
                   Save Inward
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* History / Delete Modal */}
+      {showHistoryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[80vh]">
+            <div className="bg-gray-800 px-6 py-4 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <History size={20} /> Inward Transaction History
+              </h3>
+              <button onClick={() => setShowHistoryModal(false)} className="text-gray-400 hover:text-white transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="p-0 overflow-y-auto flex-1">
+               <table className="w-full text-sm text-left">
+                 <thead className="bg-gray-100 text-gray-600 sticky top-0 border-b border-gray-200">
+                   <tr>
+                     <th className="px-6 py-3 font-medium">Date</th>
+                     <th className="px-6 py-3 font-medium">Item</th>
+                     <th className="px-6 py-3 font-medium text-right">Qty</th>
+                     <th className="px-6 py-3 font-medium text-center">Action</th>
+                   </tr>
+                 </thead>
+                 <tbody className="divide-y divide-gray-100">
+                   {transactions.map(txn => {
+                     const item = MASTER_STOCK_LIST.find(i => i.id === txn.itemId);
+                     return (
+                       <tr key={txn.id} className="hover:bg-gray-50">
+                         <td className="px-6 py-3 whitespace-nowrap">{txn.date}</td>
+                         <td className="px-6 py-3">
+                           <div className="font-bold text-gray-800">{item?.name || txn.itemId}</div>
+                           <div className="text-xs text-gray-500">{txn.notes}</div>
+                         </td>
+                         <td className="px-6 py-3 text-right font-mono font-bold text-green-600">
+                           +{txn.qty}
+                         </td>
+                         <td className="px-6 py-3 text-center">
+                           <button 
+                             onClick={() => handleDeleteTransaction(txn.id)}
+                             className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
+                             title="Delete Transaction"
+                           >
+                             <Trash2 size={16} />
+                           </button>
+                         </td>
+                       </tr>
+                     );
+                   })}
+                   {transactions.length === 0 && (
+                     <tr>
+                       <td colSpan={4} className="px-6 py-12 text-center text-gray-400">
+                         No manual inward transactions found.
+                       </td>
+                     </tr>
+                   )}
+                 </tbody>
+               </table>
+            </div>
+            <div className="p-4 border-t border-gray-200 bg-gray-50 text-right">
+               <button onClick={() => setShowHistoryModal(false)} className="px-6 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium">
+                 Close
+               </button>
             </div>
           </div>
         </div>
