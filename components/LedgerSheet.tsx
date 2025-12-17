@@ -1,3 +1,5 @@
+
+// ... imports remain the same
 import React, { useState, useMemo } from 'react';
 import { ProductionRecord } from '../types';
 import { FileText, Printer, Calendar, Filter, ArrowRight, Eye, X, Check } from 'lucide-react';
@@ -287,7 +289,10 @@ export const LedgerSheet: React.FC<LedgerSheetProps> = ({ records }) => {
                   >
                     <td className="px-3 py-3 border-r border-gray-300 whitespace-nowrap print:border-black print:py-1 print:px-1">{r.date}</td>
                     <td className="px-3 py-3 border-r border-gray-300 print:border-black print:py-1 print:px-1">
-                      <span className="block truncate">{r.productName}</span>
+                      <span className="block truncate">
+                        {r.productName}
+                        {r.isReturn && <span className="ml-1 text-[10px] font-bold text-orange-600 uppercase border border-orange-200 px-1 rounded bg-orange-50">(Return)</span>}
+                      </span>
                     </td>
                     <td className="px-3 py-3 border-r border-gray-300 font-mono text-xs print:border-black print:py-1 print:px-1 print:text-[10px]">{r.batchNo}</td>
                     <td className="px-3 py-3 border-r border-gray-300 whitespace-nowrap print:border-black print:py-1 print:px-1">{r.size}</td>

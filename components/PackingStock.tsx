@@ -1,15 +1,15 @@
 
+// ... (Imports remain same)
 import React, { useState, useMemo } from 'react';
 import { ProductionRecord, PackingStockItem, StockTransaction } from '../types';
 import { getStockTransactions, saveStockTransaction } from '../services/storageService';
-import { Package, Plus, ArrowDown, Search, RefreshCw, Lock, AlertTriangle, Info } from 'lucide-react';
+import { Package, Plus, ArrowDown, Search, RefreshCw, Lock, AlertTriangle, Info, Calendar } from 'lucide-react';
 import { PRODUCT_CATALOG } from '../data/products';
 
-// --- Configuration ---
+// ... (Configuration and Master Data remain exactly same as previous state)
 // Records ON or AFTER this date will be deducted from Opening Stock.
 const STOCK_CALCULATION_START_DATE = '2024-12-01';
 
-// --- Master Data (Opening Balance as of Nov 30th) ---
 const MASTER_STOCK_LIST: PackingStockItem[] = [
   // Packets (PD)
   { id: 'PD1001', itemNo: '101458CD004', name: 'PACKETS 6013 - 50 X 70 X 360', openingStock: 30974, unit: 'PCS', remark: 'Each Carton 300pcs 4.0kg (F4)' },
@@ -62,6 +62,7 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [inwardModalItem, setInwardModalItem] = useState<PackingStockItem | null>(null);
   const [inwardQty, setInwardQty] = useState('');
+  const [inwardDate, setInwardDate] = useState(new Date().toISOString().split('T')[0]);
   const [refreshKey, setRefreshKey] = useState(0); 
   
   // Tooltip State
@@ -181,7 +182,9 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
 
     // 3. Process Issues (From Production Records) starting Dec 1st
     records.forEach(record => {
+        // Skip if before calculation date OR if it is a RETURN (Returns don't consume empty boxes)
         if (record.date < STOCK_CALCULATION_START_DATE) return;
+        if (record.isReturn) return;
 
         const { packetId, cartonId } = resolveMaterialIds(record);
 
@@ -237,13 +240,14 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
     return { stockData: finalData };
   }, [records, transactions, refreshKey]);
 
+  // ... (Rest of component remains exactly same, only the calculation block above changed)
   const handleSaveInward = () => {
-    if (!inwardModalItem || !inwardQty) return;
+    if (!inwardModalItem || !inwardQty || !inwardDate) return;
     
     const txn: StockTransaction = {
       id: crypto.randomUUID(),
       itemId: inwardModalItem.id,
-      date: new Date().toISOString().split('T')[0],
+      date: inwardDate,
       qty: Number(inwardQty),
       type: 'INWARD',
       notes: 'Manual Entry'
@@ -253,6 +257,7 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
     setTransactions(updated);
     setInwardModalItem(null);
     setInwardQty('');
+    setInwardDate(new Date().toISOString().split('T')[0]);
   };
 
   const filteredStock = stockData.filter(s => 
@@ -368,7 +373,10 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
                   <td className="px-4 py-3 text-xs text-gray-500">{item.remark}</td>
                   <td className="px-4 py-3 text-center">
                     <button 
-                      onClick={() => setInwardModalItem(item)}
+                      onClick={() => {
+                        setInwardModalItem(item);
+                        setInwardDate(new Date().toISOString().split('T')[0]); // Reset date to today on open
+                      }}
                       className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                       title="Add Inward Stock"
                     >
@@ -458,6 +466,20 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
               <p className="text-green-100 text-sm truncate">{inwardModalItem.name}</p>
             </div>
             <div className="p-6 space-y-4">
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Receipt Date</label>
+                <div className="relative">
+                   <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                   <input 
+                     type="date" 
+                     value={inwardDate}
+                     onChange={(e) => setInwardDate(e.target.value)}
+                     className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none font-medium"
+                   />
+                </div>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Quantity to Add ({inwardModalItem.unit})</label>
                 <input 
@@ -469,6 +491,7 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
                   placeholder="0"
                 />
               </div>
+
               <div className="flex gap-3">
                 <button 
                   onClick={() => setInwardModalItem(null)}

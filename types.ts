@@ -11,6 +11,7 @@ export interface ProductionRecord {
   cartonCtn: number;
   notes: string;
   timestamp: number;
+  isReturn?: boolean; // True if this is a sales return/material return from customer
 }
 
 export interface DailySummary {
@@ -91,6 +92,6 @@ export interface StockTransaction {
   notes?: string;
 }
 
-export type ViewState = 'dashboard' | 'entry' | 'history' | 'batches' | 'dispatch' | 'settings' | 'ledger_sheet' | 'sales_entry' | 'sales_dashboard' | 'customers' | 'packing_stock' | 'analytics';
+export type ViewState = 'dashboard' | 'entry' | 'history' | 'batches' | 'dispatch' | 'settings' | 'ledger_sheet' | 'sales_entry' | 'sales_dashboard' | 'customers' | 'packing_stock' | 'analytics' | 'finished_goods';
 
 export type UserRole = 'admin' | 'yadav' | 'sales';

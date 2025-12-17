@@ -19,7 +19,8 @@ import {
   CheckCircle,
   AlertCircle,
   Package,
-  PieChart
+  PieChart,
+  ClipboardList
 } from 'lucide-react';
 import { ViewState, ProductionRecord, UserRole, SalesOrder } from './types';
 import { getRecords, saveRecord, deleteRecord, getSalesOrders, saveSalesOrder, deleteSalesOrder, deleteSalesOrders } from './services/storageService';
@@ -37,6 +38,7 @@ import { SalesDashboard } from './components/SalesDashboard';
 import { CustomerDatabase } from './components/CustomerDatabase';
 import { PackingStock } from './components/PackingStock';
 import { VisualAnalytics } from './components/VisualAnalytics';
+import { FinishedGoodsStock } from './components/FinishedGoodsStock';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -257,7 +259,7 @@ function App() {
   const canAccess = (feature: ViewState) => {
     if (userRole === 'admin') return true;
     if (userRole === 'yadav') return ['dashboard', 'entry', 'ledger_sheet', 'packing_stock', 'analytics'].includes(feature);
-    if (userRole === 'sales') return ['sales_dashboard', 'sales_entry', 'customers'].includes(feature);
+    if (userRole === 'sales') return ['sales_dashboard', 'sales_entry', 'customers', 'finished_goods'].includes(feature);
     return false;
   };
 
@@ -304,6 +306,8 @@ function App() {
           {canAccess('ledger_sheet') && <NavItem target="ledger_sheet" icon={FileText} label="Daily Report" />}
           
           {canAccess('packing_stock') && <NavItem target="packing_stock" icon={Package} label="Packing Stock" />}
+          {canAccess('finished_goods') && <NavItem target="finished_goods" icon={ClipboardList} label="Finished Goods" />}
+          
           {canAccess('batches') && <NavItem target="batches" icon={Archive} label="Batch Registry" />}
           {canAccess('dispatch') && <NavItem target="dispatch" icon={Truck} label="Dispatch Helper" />}
           {canAccess('history') && <NavItem target="history" icon={History} label="History" />}
@@ -344,8 +348,9 @@ function App() {
             <h1 className="text-xl md:text-2xl font-bold text-gray-800">
               {view === 'dashboard' && 'Daily Summary'}
               {view === 'analytics' && 'Visual Analytics'}
-              {view === 'entry' && (editingRecord ? 'Edit Ledger Entry' : 'New Ledger Entry')}
+              {view === 'entry' && (editingRecord ? (editingRecord.isReturn ? 'Edit Return Entry' : 'Edit Ledger Entry') : 'New Ledger Entry')}
               {view === 'packing_stock' && 'Packing Material Stock'}
+              {view === 'finished_goods' && 'Finished Goods Inventory'}
               {view === 'batches' && 'Batch Registry'}
               {view === 'ledger_sheet' && 'Daily Ledger Report'}
               {view === 'dispatch' && 'Dispatch Priority (FIFO)'}
@@ -379,6 +384,8 @@ function App() {
           )}
 
           {canAccess('packing_stock') && view === 'packing_stock' && <PackingStock records={records} />}
+
+          {canAccess('finished_goods') && view === 'finished_goods' && <FinishedGoodsStock />}
 
           {canAccess('batches') && view === 'batches' && <BatchRegistry records={records} />}
           
@@ -431,7 +438,14 @@ function App() {
                         <td className="px-4 py-4 whitespace-nowrap">{r.date}</td>
                         <td className="px-4 py-4 font-mono text-xs text-gray-600 font-bold">{r.batchNo}</td>
                         <td className="px-4 py-4">
-                          <div className="font-medium text-gray-900 line-clamp-1">{r.productName}</div>
+                          <div className="font-medium text-gray-900 line-clamp-1 flex items-center gap-2">
+                             {r.productName}
+                             {r.isReturn && (
+                               <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-orange-100 text-orange-800 uppercase tracking-wide">
+                                 Return
+                               </span>
+                             )}
+                          </div>
                           <div className="text-xs text-gray-500">{r.size}</div>
                         </td>
                         <td className="px-4 py-4 text-right font-mono text-blue-600 print:text-black">{r.weightKg.toFixed(2)}</td>
@@ -480,7 +494,7 @@ function App() {
                 </button>
              </div>
     
-             {userRole === 'admin' && <MobileNavIcon target="packing_stock" icon={Package} label="Stock" />}
+             {userRole === 'admin' && <MobileNavIcon target="finished_goods" icon={ClipboardList} label="Stock" />}
              {userRole === 'yadav' && <MobileNavIcon target="batches" icon={Archive} label="Batches" />}
 
              {canAccess('history') && <MobileNavIcon target="history" icon={History} label="History" />}
@@ -499,7 +513,8 @@ function App() {
                   <Plus size={32} />
                 </button>
              </div>
-             <div className="w-8"></div>
+             {/* Add Stock View for Sales */}
+             <MobileNavIcon target="finished_goods" icon={ClipboardList} label="Stock" />
            </>
          )}
       </nav>
