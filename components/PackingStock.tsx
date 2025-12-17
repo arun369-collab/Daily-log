@@ -383,13 +383,30 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
       </div>
 
       {/* Floating Breakdown Tooltip */}
-      {hoveredBreakdown && (
+      {hoveredBreakdown && (() => {
+        // Smart Positioning Logic
+        const viewportHeight = window.innerHeight;
+        const isBottomHalf = hoveredBreakdown.y > viewportHeight / 2;
+        
+        const style: React.CSSProperties = {
+          left: Math.max(10, hoveredBreakdown.x - 300), // Prevent going off-left
+        };
+
+        if (isBottomHalf) {
+           // Position ABOVE the row
+           // 'bottom' is distance from screen bottom to element top
+           style.bottom = viewportHeight - hoveredBreakdown.y + 10;
+           style.transformOrigin = 'bottom right';
+        } else {
+           // Position BELOW/OVER the row
+           style.top = hoveredBreakdown.y - 10;
+           style.transformOrigin = 'top right';
+        }
+
+        return (
         <div 
           className="fixed z-50 bg-white shadow-xl border border-gray-200 rounded-lg p-0 w-72 text-sm pointer-events-none overflow-hidden animate-fadeIn"
-          style={{ 
-            top: hoveredBreakdown.y - 20, // Slightly offset up
-            left: hoveredBreakdown.x - 300, // Show to the left of the cursor
-          }}
+          style={style}
         >
           <div className="bg-gray-100 px-3 py-2 border-b border-gray-200 font-bold text-gray-700 text-xs flex justify-between items-center">
              <span className="truncate max-w-[170px]">{hoveredBreakdown.itemName}</span>
@@ -427,7 +444,8 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
              Total: {hoveredBreakdown.data.reduce((acc, curr) => acc + curr.qty, 0).toLocaleString()}
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Inward Modal */}
       {inwardModalItem && (
