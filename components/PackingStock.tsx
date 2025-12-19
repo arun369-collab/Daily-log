@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { ProductionRecord, PackingStockItem, StockTransaction } from '../types';
 import { getStockTransactions, saveStockTransaction, deleteStockTransaction } from '../services/storageService';
-import { Package, Plus, ArrowDown, Search, RefreshCw, Lock, AlertTriangle, Calendar, History, Trash2, X, Download } from 'lucide-react';
+import { Package, Plus, ArrowDown, Search, RefreshCw, Lock, AlertTriangle, Calendar, History, Trash2, X, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 import { PRODUCT_CATALOG } from '../data/products';
 
 // Records ON or AFTER this date will be deducted from Opening Stock.
@@ -58,6 +58,7 @@ interface PackingStockProps {
 
 export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [inwardModalItem, setInwardModalItem] = useState<PackingStockItem | null>(null);
   const [inwardQty, setInwardQty] = useState('');
   const [inwardDate, setInwardDate] = useState(new Date().toISOString().split('T')[0]);
@@ -120,6 +121,7 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
   const { stockData } = useMemo(() => {
     const calculatedData = MASTER_STOCK_LIST.map(item => ({
       ...item,
+      dynamicOpening: item.openingStock,
       inward: 0,
       issued: 0,
       available: item.openingStock,
@@ -127,53 +129,77 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
       inwardBreakdown: [] as BreakdownItem[]
     }));
 
+    // --- 1. Calculate History up to the start of selectedDate ---
     transactions.forEach(txn => {
         const item = calculatedData.find(i => i.id === txn.itemId);
         if (item) {
-            item.inward += txn.qty;
-            item.available += txn.qty;
-            item.inwardBreakdown.push({
-              date: txn.date,
-              batch: txn.notes || 'Manual Add',
-              qty: txn.qty
-            });
+            if (txn.date < selectedDate) {
+                item.dynamicOpening += txn.qty;
+                item.available += txn.qty;
+            } else if (txn.date === selectedDate) {
+                item.inward += txn.qty;
+                item.available += txn.qty;
+                item.inwardBreakdown.push({
+                  date: txn.date,
+                  batch: txn.notes || 'Manual Add',
+                  qty: txn.qty
+                });
+            }
         }
     });
 
     records.forEach(record => {
-        // SKIP: Return entries AND Dispatch entries (Dispatch does not consume new packing mat)
         if (record.date < STOCK_CALCULATION_START_DATE || record.isReturn || record.isDispatch) return;
         
         const { packetId, cartonId } = resolveMaterialIds(record);
 
+        // Packet Deductions
         if (packetId) {
             const pktItem = calculatedData.find(i => i.id === packetId);
             if (pktItem) {
-                pktItem.issued += record.duplesPkt;
-                pktItem.available -= record.duplesPkt;
-                pktItem.breakdown.push({ date: record.date, batch: record.batchNo, qty: record.duplesPkt });
+                if (record.date < selectedDate) {
+                    pktItem.dynamicOpening -= record.duplesPkt;
+                    pktItem.available -= record.duplesPkt;
+                } else if (record.date === selectedDate) {
+                    pktItem.issued += record.duplesPkt;
+                    pktItem.available -= record.duplesPkt;
+                    pktItem.breakdown.push({ date: record.date, batch: record.batchNo, qty: record.duplesPkt });
+                }
             }
+            // Handle Vacuum Foil logic
             if (packetId === 'PD1006') {
                  const foilItem = calculatedData.find(i => i.id === 'VP1002');
                  if (foilItem) {
-                     foilItem.issued += record.duplesPkt;
-                     foilItem.available -= record.duplesPkt;
-                     foilItem.breakdown.push({ date: record.date, batch: record.batchNo, qty: record.duplesPkt });
+                     if (record.date < selectedDate) {
+                         foilItem.dynamicOpening -= record.duplesPkt;
+                         foilItem.available -= record.duplesPkt;
+                     } else if (record.date === selectedDate) {
+                         foilItem.issued += record.duplesPkt;
+                         foilItem.available -= record.duplesPkt;
+                         foilItem.breakdown.push({ date: record.date, batch: record.batchNo, qty: record.duplesPkt });
+                     }
                  }
             }
         }
+        
+        // Carton Deductions
         if (cartonId) {
             const ctnItem = calculatedData.find(i => i.id === cartonId);
             if (ctnItem) {
-                ctnItem.issued += record.cartonCtn;
-                ctnItem.available -= record.cartonCtn;
-                ctnItem.breakdown.push({ date: record.date, batch: record.batchNo, qty: record.cartonCtn });
+                if (record.date < selectedDate) {
+                    ctnItem.dynamicOpening -= record.cartonCtn;
+                    ctnItem.available -= record.cartonCtn;
+                } else if (record.date === selectedDate) {
+                    ctnItem.issued += record.cartonCtn;
+                    ctnItem.available -= record.cartonCtn;
+                    ctnItem.breakdown.push({ date: record.date, batch: record.batchNo, qty: record.cartonCtn });
+                }
             }
         }
     });
 
     return { stockData: calculatedData };
-  }, [records, transactions, refreshKey]);
+  }, [records, transactions, selectedDate, refreshKey]);
 
   const handleSaveInward = () => {
     if (!inwardModalItem || !inwardQty || !inwardDate) return;
@@ -190,6 +216,12 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
     setInwardQty('');
   };
 
+  const adjustDate = (days: number) => {
+    const d = new Date(selectedDate);
+    d.setDate(d.getDate() + days);
+    setSelectedDate(d.toISOString().split('T')[0]);
+  };
+
   const handleDeleteTransaction = (id: string) => {
     if (window.confirm("Delete this inward entry?")) {
         setTransactions(deleteStockTransaction(id));
@@ -201,16 +233,16 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
   );
 
   const handleExport = () => {
-    const headers = ["ID", "Item No", "Product Name", "BF Qty (Nov 30)", "Inward", "Issues", "Available", "Unit", "Remark"];
+    const headers = ["ID", "Item No", "Product Name", `Opening (${selectedDate})`, "Daily Inward", "Daily Issues", "Available", "Unit", "Remark"];
     const rows = filteredStock.map(r => [
-      r.id, r.itemNo, `"${r.name}"`, r.openingStock, r.inward, r.issued, r.available, r.unit, `"${r.remark}"`
+      r.id, r.itemNo, `"${r.name}"`, r.dynamicOpening, r.inward, r.issued, r.available, r.unit, `"${r.remark}"`
     ]);
     const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
     const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `Packing_Stock_Report_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `Packing_Stock_${selectedDate}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -226,7 +258,7 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
           </div>
           <div>
             <h2 className="text-xl font-bold text-gray-800">Packing Stock</h2>
-            <p className="text-sm text-gray-500">Live Inventory Management</p>
+            <p className="text-sm text-gray-500">Inventory Tracking by Date</p>
           </div>
         </div>
 
@@ -269,17 +301,30 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
         
         {/* Title Bar */}
         <div className="bg-[#4472c4] text-white text-center py-2 font-bold text-lg border-b border-gray-400 uppercase tracking-wider">
-          Packing Material Stock Report
+          Packing Material Daily Stock Report
         </div>
         
-        {/* Date & Indicator Row */}
-        <div className="bg-white border-b border-black flex justify-between items-center px-4 py-1">
-          <div className="text-[10px] flex items-center gap-4 text-gray-500 font-bold uppercase">
-             <span className="flex items-center gap-1"><Lock size={10} /> Opening: Nov 30</span>
-             <span className="flex items-center gap-1 text-blue-700"><RefreshCw size={10} /> Deductions from: Dec 1st</span>
+        {/* Date Selector Row */}
+        <div className="bg-white border-b border-black flex justify-between items-center px-4 py-2">
+          <div className="flex items-center gap-2">
+             <button onClick={() => adjustDate(-1)} className="p-1 hover:bg-gray-100 rounded text-gray-500 transition-colors">
+               <ChevronLeft size={20} />
+             </button>
+             <div className="relative">
+                <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 text-amber-600" size={16} />
+                <input 
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="pl-9 pr-3 py-1 border border-amber-200 rounded font-bold text-amber-800 text-sm focus:ring-2 focus:ring-amber-500 outline-none bg-amber-50/30"
+                />
+             </div>
+             <button onClick={() => adjustDate(1)} className="p-1 hover:bg-gray-100 rounded text-gray-500 transition-colors">
+               <ChevronRight size={20} />
+             </button>
           </div>
-          <div className="bg-yellow-300 border border-black px-4 py-1 font-bold text-black flex items-center gap-2 text-sm">
-             Date: {new Date().toLocaleDateString('en-GB')}
+          <div className="bg-yellow-300 border border-black px-4 py-1 font-black text-black text-xs uppercase tracking-tighter">
+             Report Date: {new Date(selectedDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
           </div>
         </div>
 
@@ -288,12 +333,11 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
             <thead>
                <tr className="text-black uppercase">
                  <th className="bg-[#70ad47] border border-black px-3 py-2 text-left font-bold w-12">ID</th>
-                 <th className="bg-[#70ad47] border border-black px-3 py-2 text-left font-bold w-32">Item No</th>
                  <th className="bg-[#70ad47] border border-black px-3 py-2 text-left font-bold">Product Name</th>
-                 <th className="bg-[#70ad47] border border-black px-3 py-2 text-right font-bold w-32">BF Qty<br/><span className="text-[10px] font-normal">(Nov 30)</span></th>
+                 <th className="bg-[#70ad47] border border-black px-3 py-2 text-right font-bold w-32">BF Qty<br/><span className="text-[10px] font-normal italic">Opening</span></th>
                  <th className="bg-[#70ad47] border border-black px-3 py-2 text-right font-bold w-24">Inward</th>
                  <th className="bg-[#70ad47] border border-black px-3 py-2 text-right font-bold w-24">Issues</th>
-                 <th className="bg-[#70ad47] border border-black px-3 py-2 text-right font-bold w-32 bg-amber-500">Available</th>
+                 <th className="bg-[#70ad47] border border-black px-3 py-2 text-right font-bold w-32 bg-amber-500">Closing</th>
                  <th className="bg-[#70ad47] border border-black px-3 py-2 text-center font-bold w-20">Action</th>
                </tr>
             </thead>
@@ -303,9 +347,6 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
                     <td className="border border-black px-3 py-1 font-mono text-xs bg-[#e2efda] text-black">
                       {row.id}
                     </td>
-                    <td className="border border-black px-3 py-1 font-mono text-xs bg-[#e2efda] text-black">
-                      {row.itemNo || '-'}
-                    </td>
                     <td className="border border-black px-3 py-1 font-bold bg-[#e2efda] text-black">
                       {row.name}
                       {row.available <= 500 && (
@@ -313,10 +354,10 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
                       )}
                     </td>
                     <td className="border border-black px-3 py-1 text-right font-bold bg-[#e2efda] text-black">
-                      {row.openingStock.toLocaleString()}
+                      {row.dynamicOpening.toLocaleString()}
                     </td>
                     
-                    {/* Inward Column with Hover Log */}
+                    {/* Daily Inward */}
                     <td 
                       onMouseEnter={(e) => {
                         if (row.inward <= 0) return;
@@ -324,12 +365,12 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
                         setHoveredBreakdown({ x: rect.right, y: rect.top, data: row.inwardBreakdown, itemName: row.name, type: 'INWARD' });
                       }}
                       onMouseLeave={() => setHoveredBreakdown(null)}
-                      className={`border border-black px-3 py-1 text-right bg-[#e2efda] font-bold transition-colors ${row.inward > 0 ? 'text-green-700 cursor-help hover:bg-green-50' : 'text-gray-400'}`}
+                      className={`border border-black px-3 py-1 text-right bg-[#e2efda] font-bold transition-colors ${row.inward > 0 ? 'text-green-700 cursor-help hover:bg-blue-50' : 'text-gray-400'}`}
                     >
                       {row.inward > 0 ? `+${row.inward.toLocaleString()}` : '-'}
                     </td>
                     
-                    {/* Issue Column with Hover Log */}
+                    {/* Daily Issues */}
                     <td 
                       onMouseEnter={(e) => {
                         if (row.issued <= 0) return;
@@ -342,7 +383,7 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
                       {row.issued > 0 ? `-${row.issued.toLocaleString()}` : '-'}
                     </td>
                     
-                    {/* Available Stock */}
+                    {/* Closing Available */}
                     <td className={`border border-black px-3 py-1 text-right font-bold bg-[#e2efda] text-lg ${row.available <= 500 ? 'text-red-700' : 'text-black'}`}>
                        {row.available.toLocaleString()}
                     </td>
@@ -350,7 +391,7 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
                     {/* Quick Add Action */}
                     <td className="border border-black px-3 py-1 text-center bg-[#e2efda]">
                       <button 
-                        onClick={() => { setInwardModalItem(row); setInwardDate(new Date().toISOString().split('T')[0]); }}
+                        onClick={() => { setInwardModalItem(row); setInwardDate(selectedDate); }}
                         className="p-1 bg-white border border-black rounded hover:bg-blue-50 text-blue-700 transition-colors shadow-sm"
                         title="Add Stock"
                       >
@@ -362,8 +403,8 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
                
                {/* Total Row */}
                <tr className="bg-yellow-100 font-bold border-t-2 border-black text-black">
-                  <td className="border border-black px-3 py-2 text-right" colSpan={3}>Grand Totals:</td>
-                  <td className="border border-black px-3 py-2 text-right">{filteredStock.reduce((acc, curr) => acc + curr.openingStock, 0).toLocaleString()}</td>
+                  <td className="border border-black px-3 py-2 text-right" colSpan={2}>Grand Daily Activity:</td>
+                  <td className="border border-black px-3 py-2 text-right">{filteredStock.reduce((acc, curr) => acc + curr.dynamicOpening, 0).toLocaleString()}</td>
                   <td className="border border-black px-3 py-2 text-right text-green-700">+{filteredStock.reduce((acc, curr) => acc + curr.inward, 0).toLocaleString()}</td>
                   <td className="border border-black px-3 py-2 text-right text-red-700">-{filteredStock.reduce((acc, curr) => acc + curr.issued, 0).toLocaleString()}</td>
                   <td className="border border-black px-3 py-2 text-right text-lg">{filteredStock.reduce((acc, curr) => acc + curr.available, 0).toLocaleString()}</td>
@@ -374,7 +415,7 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
         </div>
       </div>
 
-      {/* Floating Log Breakdown (Mirroring style from previous iteration but cleaner) */}
+      {/* Floating Log Breakdown */}
       {hoveredBreakdown && (
         <div 
           className="fixed z-50 bg-white shadow-2xl border border-black rounded-sm p-0 w-80 text-xs pointer-events-none overflow-hidden animate-fadeIn"
@@ -386,32 +427,29 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
         >
           <div className={`${hoveredBreakdown.type === 'INWARD' ? 'bg-green-700' : 'bg-red-700'} text-white px-3 py-1.5 font-bold flex justify-between`}>
              <span className="truncate w-48">{hoveredBreakdown.itemName}</span>
-             <span>{hoveredBreakdown.type === 'INWARD' ? 'Inward Log' : 'Issue Log'}</span>
+             <span>{hoveredBreakdown.type} ON {selectedDate}</span>
           </div>
           <div className="max-h-60 overflow-y-auto">
              <table className="w-full">
                 <thead className="bg-gray-100 text-gray-800 border-b border-black">
                    <tr>
-                      <th className="px-2 py-1 text-left font-bold">Date</th>
                       <th className="px-2 py-1 text-left font-bold">Reference</th>
                       <th className="px-2 py-1 text-right font-bold">Qty</th>
                    </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                    {hoveredBreakdown.data
-                     .sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime())
                      .map((entry, idx) => (
                       <tr key={idx} className="hover:bg-yellow-50">
-                         <td className="px-2 py-1 text-gray-800">{entry.date}</td>
-                         <td className="px-2 py-1 font-mono text-gray-600 truncate max-w-[120px]">{entry.batch}</td>
+                         <td className="px-2 py-1 font-mono text-gray-600 truncate">{entry.batch}</td>
                          <td className={`px-2 py-1 text-right font-bold ${hoveredBreakdown.type === 'INWARD' ? 'text-green-700' : 'text-red-700'}`}>{entry.qty.toLocaleString()}</td>
                       </tr>
                    ))}
                 </tbody>
              </table>
           </div>
-          <div className="bg-gray-50 px-3 py-1 border-t border-black text-right font-bold text-black">
-             Total {hoveredBreakdown.type === 'INWARD' ? 'Inward' : 'Issued'}: {hoveredBreakdown.data.reduce((acc, curr) => acc + curr.qty, 0).toLocaleString()}
+          <div className="bg-gray-50 px-3 py-1 border-t border-black text-right font-bold text-black uppercase tracking-tighter">
+             Daily {hoveredBreakdown.type}: {hoveredBreakdown.data.reduce((acc, curr) => acc + curr.qty, 0).toLocaleString()}
           </div>
         </div>
       )}
