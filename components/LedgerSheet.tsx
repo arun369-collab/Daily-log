@@ -357,10 +357,10 @@ export const LedgerSheet: React.FC<LedgerSheetProps> = ({ records }) => {
                           {r.productName}
                         </span>
                         {r.isReturn && (
-                           <span className="px-1 text-[7px] font-black bg-orange-600 text-white rounded uppercase whitespace-nowrap">Return</span>
+                           <span className="px-1.5 py-0.5 text-[8px] font-black bg-[#f26522] text-white rounded-sm uppercase whitespace-nowrap tracking-tighter">Return</span>
                         )}
                         {r.isDispatch && (
-                           <span className="px-1 text-[7px] font-black bg-red-600 text-white rounded uppercase whitespace-nowrap">Desp</span>
+                           <span className="px-1.5 py-0.5 text-[8px] font-black bg-red-600 text-white rounded-sm uppercase whitespace-nowrap tracking-tighter">Desp</span>
                         )}
                       </div>
                     </td>
@@ -373,10 +373,10 @@ export const LedgerSheet: React.FC<LedgerSheetProps> = ({ records }) => {
                       {r.rejectedKg > 0 ? r.rejectedKg.toFixed(2) : '-'}
                     </td>
                     <td className="px-1.5 py-2 border-r border-black text-right">
-                       {r.duplesPkt > 0 ? r.duplesPkt : '-'}
+                       {(r.isReturn || r.isDispatch) ? '-' : (r.duplesPkt > 0 ? r.duplesPkt : '-')}
                     </td>
                     <td className="px-1.5 py-2 text-right font-bold">
-                       {r.cartonCtn > 0 ? r.cartonCtn : '-'}
+                       {(r.isReturn || r.isDispatch) ? '-' : (r.cartonCtn > 0 ? r.cartonCtn : '-')}
                     </td>
                   </tr>
                 ))}
@@ -393,10 +393,10 @@ export const LedgerSheet: React.FC<LedgerSheetProps> = ({ records }) => {
                         {filteredRecords.reduce((sum, r) => sum + r.rejectedKg, 0).toFixed(2)}
                       </td>
                       <td className="px-1.5 py-3 text-right border-r border-black print:text-[9pt]">
-                         {filteredRecords.reduce((sum, r) => sum + r.duplesPkt, 0).toLocaleString()}
+                         {(entryFilter === 'return' || entryFilter === 'dispatch') ? '-' : filteredRecords.reduce((sum, r) => sum + (r.isReturn || r.isDispatch ? 0 : r.duplesPkt), 0).toLocaleString()}
                       </td>
                       <td className="px-1.5 py-3 text-right font-black text-sm print:text-[9pt]">
-                         {filteredRecords.reduce((sum, r) => sum + r.cartonCtn, 0).toLocaleString()}
+                         {(entryFilter === 'return' || entryFilter === 'dispatch') ? '-' : filteredRecords.reduce((sum, r) => sum + (r.isReturn || r.isDispatch ? 0 : r.cartonCtn), 0).toLocaleString()}
                       </td>
                    </tr>
                 </tfoot>
