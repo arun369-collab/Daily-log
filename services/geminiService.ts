@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from "@google/genai";
 import { ProductionRecord } from "../types";
 
@@ -15,7 +16,7 @@ export const generateProductionInsight = async (records: ProductionRecord[]): Pr
   const ai = getAiClient();
   
   if (!ai) {
-    return "AI Service Unavailable: API Key is missing. Please add API_KEY to your environment variables.";
+    return "AI Service Unavailable: API Key is missing.";
   }
 
   if (records.length === 0) {
@@ -53,8 +54,9 @@ export const generateProductionInsight = async (records: ProductionRecord[]): Pr
   `;
 
   try {
+    // Corrected the model name to 'gemini-3-flash-preview' per task requirements and guidelines
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-flash-preview',
       contents: prompt,
       config: {
         systemInstruction: "You are an expert manufacturing data analyst specialized in factory ledgers.",

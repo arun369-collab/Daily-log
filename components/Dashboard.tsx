@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState } from 'react';
 import { ProductionRecord } from '../types';
 import { generateProductionInsight } from '../services/geminiService';
@@ -18,9 +19,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ records }) => {
 
   // Memoized computations for performance
   const stats = useMemo(() => {
-    const totalWeight = records.reduce((acc, r) => acc + r.weightKg, 0);
-    const totalRejected = records.reduce((acc, r) => acc + r.rejectedKg, 0);
-    const totalCartons = records.reduce((acc, r) => acc + r.cartonCtn, 0);
+    // ONLY count production (Exclude dispatch and returns from production volume)
+    const prodRecords = records.filter(r => !r.isDispatch && !r.isReturn);
+    
+    const totalWeight = prodRecords.reduce((acc, r) => acc + r.weightKg, 0);
+    const totalRejected = prodRecords.reduce((acc, r) => acc + r.rejectedKg, 0);
+    const totalCartons = prodRecords.reduce((acc, r) => acc + r.cartonCtn, 0);
     
     // Pallets Calculation: 1000kg = 1 Pallet
     const totalPallets = totalWeight / 1000;
@@ -30,14 +34,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ records }) => {
     const rejectionRate = totalProcessed > 0 ? ((totalRejected / totalProcessed) * 100).toFixed(2) : "0.00";
     
     // Unique Batches
-    const uniqueBatches = new Set(records.map(r => r.batchNo)).size;
+    const uniqueBatches = new Set(prodRecords.map(r => r.batchNo)).size;
 
     return { totalWeight, totalRejected, totalCartons, rejectionRate, uniqueBatches, totalPallets };
   }, [records]);
 
   const chartData = useMemo(() => {
-    // Group by Date for the chart
-    const grouped = records.reduce((acc, curr) => {
+    // Group by Date for the chart - PRODUCTION ONLY
+    const prodRecords = records.filter(r => !r.isDispatch && !r.isReturn);
+    
+    const grouped = prodRecords.reduce((acc, curr) => {
       const existing = acc.find(item => item.date === curr.date);
       if (existing) {
         existing.weightKg += curr.weightKg;
@@ -54,7 +60,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ records }) => {
 
   const handleGenerateInsight = async () => {
     setLoadingAi(true);
-    const insight = await generateProductionInsight(records);
+    // Insight should probably know about both, but let's focus on production for now
+    const insight = await generateProductionInsight(records.filter(r => !r.isDispatch));
     setAiSummary(insight);
     setLoadingAi(false);
   };
@@ -68,7 +75,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ records }) => {
           value={stats.totalWeight.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 
           icon={Scale} 
           colorClass="text-blue-600"
-          trend="Net Good Weight"
+          trend="Net Good Weight Produced"
         />
         <StatCard 
           title="Total Pallets" 
@@ -98,7 +105,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ records }) => {
         <div className="lg:col-span-2 space-y-6">
           {/* Production Trend Chart */}
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Production Weight vs Rejections (Last 7 Days)</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">Production Weight vs Rejections</h3>
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest bg-gray-50 px-2 py-1 rounded">Last 7 Days (Manufacturing Only)</span>
+            </div>
             <div className="h-64 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartData}>
@@ -117,14 +127,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ records }) => {
           {/* Recent Activity Mini Table */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
              <div className="px-6 py-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-                <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Recent Ledger Entries</h3>
+                <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Recent Floor Entries</h3>
              </div>
              <div className="overflow-x-auto">
                <table className="w-full text-sm text-left">
                  <thead className="bg-gray-50 text-gray-500">
                    <tr>
                      <th className="px-6 py-3 font-medium">Date</th>
-                     <th className="px-6 py-3 font-medium">Batch No</th>
+                     <th className="px-6 py-3 font-medium">Ref/Batch</th>
+                     <th className="px-6 py-3 font-medium">Type</th>
                      <th className="px-6 py-3 font-medium">Product</th>
                      <th className="px-6 py-3 font-medium text-right">Weight (Kg)</th>
                    </tr>
@@ -134,16 +145,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ records }) => {
                       <tr key={r.id} className="hover:bg-gray-50">
                         <td className="px-6 py-3">{r.date}</td>
                         <td className="px-6 py-3 font-mono text-xs text-gray-600">{r.batchNo}</td>
+                        <td className="px-6 py-3">
+                           {r.isDispatch ? (
+                             <span className="text-[10px] font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded">DISPATCH</span>
+                           ) : r.isReturn ? (
+                             <span className="text-[10px] font-bold bg-orange-100 text-orange-700 px-2 py-0.5 rounded">RETURN</span>
+                           ) : (
+                             <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded">PROD</span>
+                           )}
+                        </td>
                         <td className="px-6 py-3 font-medium text-gray-900">
                           {r.productName} 
                           <span className="ml-2 text-xs text-gray-400">({r.size})</span>
                         </td>
-                        <td className="px-6 py-3 text-right">{r.weightKg.toFixed(2)}</td>
+                        <td className="px-6 py-3 text-right font-bold">{r.weightKg.toFixed(2)}</td>
                       </tr>
                     ))}
                     {records.length === 0 && (
                       <tr>
-                        <td colSpan={4} className="px-6 py-8 text-center text-gray-400">No ledger entries found.</td>
+                        <td colSpan={5} className="px-6 py-8 text-center text-gray-400">No entries found.</td>
                       </tr>
                     )}
                  </tbody>
@@ -161,7 +181,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ records }) => {
             </div>
             
             <p className="text-indigo-200 text-sm mb-6">
-              Generate a summary of Yadav's ledger data. Identifies weight trends, high rejection batches, and packaging totals.
+              Generate a summary of manufacturing performance. Identifies volume trends, quality issues, and efficiency.
             </p>
 
             <div className="flex-1 bg-white/10 rounded-lg p-4 text-sm leading-relaxed overflow-y-auto max-h-[400px]">
@@ -176,7 +196,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ records }) => {
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center h-full text-indigo-300 opacity-60">
-                  <span className="text-center">Click below to summarize today's ledger.</span>
+                  <span className="text-center">Click below to summarize manufacturing performance.</span>
                 </div>
               )}
             </div>
@@ -186,7 +206,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ records }) => {
               disabled={loadingAi || records.length === 0}
               className="mt-6 w-full py-3 bg-white text-indigo-900 rounded-lg font-bold hover:bg-indigo-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2"
             >
-              {loadingAi ? 'Thinking...' : 'Generate Ledger Report'}
+              {loadingAi ? 'Thinking...' : 'Generate Performance Report'}
             </button>
           </div>
         </div>

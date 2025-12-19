@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   LayoutDashboard, 
   PlusCircle, 
@@ -160,6 +160,14 @@ function App() {
     }
   };
 
+  // --- Filtered Records for Yadav ---
+  const displayRecords = useMemo(() => {
+    if (userRole === 'yadav') {
+      return records.filter(r => !r.isReturn && !r.isDispatch);
+    }
+    return records;
+  }, [records, userRole]);
+
   // --- Sales Order Handlers ---
   const handleSaveOrder = (order: SalesOrder) => {
     const updated = saveSalesOrder(order);
@@ -269,7 +277,7 @@ function App() {
   // Permission Check Helper
   const canAccess = (feature: ViewState) => {
     if (userRole === 'admin') return true;
-    if (userRole === 'yadav') return ['dashboard', 'entry', 'ledger_sheet', 'packing_stock', 'analytics'].includes(feature);
+    if (userRole === 'yadav') return ['dashboard', 'entry', 'ledger_sheet', 'packing_stock', 'analytics', 'batches'].includes(feature);
     if (userRole === 'sales') return ['sales_dashboard', 'sales_entry', 'customers', 'customer_behaviour'].includes(feature);
     return false;
   };
@@ -389,8 +397,8 @@ function App() {
         </header>
 
         <div className="max-w-7xl mx-auto">
-          {view === 'dashboard' && <Dashboard records={records} />}
-          {view === 'analytics' && <VisualAnalytics records={records} />}
+          {view === 'dashboard' && <Dashboard records={displayRecords} />}
+          {view === 'analytics' && <VisualAnalytics records={displayRecords} />}
           
           {view === 'entry' && (
             <DataEntry 
@@ -401,13 +409,13 @@ function App() {
             />
           )}
 
-          {canAccess('packing_stock') && view === 'packing_stock' && <PackingStock records={records} />}
+          {canAccess('packing_stock') && view === 'packing_stock' && <PackingStock records={displayRecords} />}
 
           {canAccess('finished_goods') && view === 'finished_goods' && <FinishedGoodsStock records={records} orders={salesOrders} />}
 
-          {canAccess('batches') && view === 'batches' && <BatchRegistry records={records} />}
+          {canAccess('batches') && view === 'batches' && <BatchRegistry records={displayRecords} />}
           
-          {canAccess('ledger_sheet') && view === 'ledger_sheet' && <LedgerSheet records={records} />}
+          {canAccess('ledger_sheet') && view === 'ledger_sheet' && <LedgerSheet records={displayRecords} />}
           
           {canAccess('dispatch') && view === 'dispatch' && <DispatchAssistant records={records} />}
 
@@ -453,7 +461,7 @@ function App() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {records.map((r) => (
+                    {displayRecords.map((r) => (
                       <tr key={r.id} className="hover:bg-gray-50 transition-colors print:hover:bg-transparent">
                         <td className="px-4 py-4 whitespace-nowrap">{r.date}</td>
                         <td className="px-4 py-4 font-mono text-xs text-gray-600 font-bold">{r.batchNo}</td>
