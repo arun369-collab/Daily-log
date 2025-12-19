@@ -72,8 +72,8 @@ export const LedgerSheet: React.FC<LedgerSheetProps> = ({ records }) => {
       filtered = records.filter(r => r.date >= customStart && r.date <= customEnd);
     }
 
-    // Sort descending (newest first) for display
-    return [...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    // Updated sorting to Ascending (oldest first) as requested
+    return [...filtered].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [records, reportType, selectedDate, selectedMonth, selectedWeek, customStart, customEnd]);
 
   // Dynamic Title for the Report
