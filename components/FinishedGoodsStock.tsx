@@ -74,12 +74,12 @@ export const FinishedGoodsStock: React.FC<FinishedGoodsStockProps> = ({ records 
       const normName = normalize(item.product);
       const normSize = normalize(item.size);
 
-      // 1. Production (from records, !isReturn)
+      // 1. Production (from records, !isReturn && !isDispatch)
       const productionQty = records
         .filter(r => 
           normalize(r.productName) === normName && 
           normalize(r.size) === normSize && 
-          !r.isReturn
+          !r.isReturn && !r.isDispatch
         )
         .reduce((sum, r) => sum + r.weightKg, 0);
 
@@ -92,9 +92,8 @@ export const FinishedGoodsStock: React.FC<FinishedGoodsStockProps> = ({ records 
         )
         .reduce((sum, r) => sum + r.weightKg, 0);
 
-      // 3. Despatch (from sales orders, status dispatched/delivered)
-      // Note: Orders might not be fully wired to this yet, but we put the logic in.
-      const despatchQty = orders
+      // 3. Despatch (from sales orders + manual dispatch records)
+      const orderDespatchQty = orders
         .filter(o => o.status === 'Dispatched' || o.status === 'Delivered')
         .reduce((orderSum, order) => {
            const itemTotal = order.items
@@ -102,6 +101,16 @@ export const FinishedGoodsStock: React.FC<FinishedGoodsStockProps> = ({ records 
              .reduce((iSum, i) => iSum + i.calculatedWeightKg, 0);
            return orderSum + itemTotal;
         }, 0);
+        
+      const manualDespatchQty = records
+        .filter(r => 
+          normalize(r.productName) === normName && 
+          normalize(r.size) === normSize && 
+          r.isDispatch
+        )
+        .reduce((sum, r) => sum + r.weightKg, 0);
+
+      const despatchQty = orderDespatchQty + manualDespatchQty;
 
       return {
         ...item,

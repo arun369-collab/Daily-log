@@ -12,6 +12,7 @@ export interface ProductionRecord {
   notes: string;
   timestamp: number;
   isReturn?: boolean; // True if this is a sales return/material return from customer
+  isDispatch?: boolean; // True if this is a manual dispatch entry (temporary)
 }
 
 export interface DailySummary {

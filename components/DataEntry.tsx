@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { ProductionRecord } from '../types';
-import { Save, XCircle, Package, Info, Layers, RotateCcw } from 'lucide-react';
+import { Save, XCircle, Package, Info, Layers, RotateCcw, Truck } from 'lucide-react';
 import { getFamilies, getTypesForFamily, getProductDef, ProductDefinition, PRODUCT_CATALOG } from '../data/products';
 
 interface DataEntryProps {
@@ -24,7 +24,7 @@ export const DataEntry: React.FC<DataEntryProps> = ({ onSave, onCancel, initialD
   const [cartonCtn, setCartonCtn] = useState<number | ''>('');
   const [weightKg, setWeightKg] = useState<number | ''>(''); // Good Production Weight
   const [notes, setNotes] = useState('');
-  const [isReturn, setIsReturn] = useState(false);
+  const [entryType, setEntryType] = useState<'production' | 'return' | 'dispatch'>('production');
 
   // Derived Product Definition
   const [activeDef, setActiveDef] = useState<ProductDefinition | undefined>(undefined);
@@ -42,7 +42,10 @@ export const DataEntry: React.FC<DataEntryProps> = ({ onSave, onCancel, initialD
       setCartonCtn(initialData.cartonCtn);
       setWeightKg(initialData.weightKg);
       setNotes(initialData.notes);
-      setIsReturn(!!initialData.isReturn);
+      
+      if (initialData.isDispatch) setEntryType('dispatch');
+      else if (initialData.isReturn) setEntryType('return');
+      else setEntryType('production');
 
       // Reverse lookup for product definition
       const def = PRODUCT_CATALOG.find(p => p.displayName === initialData.productName);
@@ -103,18 +106,17 @@ export const DataEntry: React.FC<DataEntryProps> = ({ onSave, onCancel, initialD
 
   // Form Validation Logic
   const isFormValid = useMemo(() => {
-    return (
-      date !== '' &&
+    const commonValid = date !== '' &&
       selectedFamily !== '' &&
       selectedType !== '' &&
       batchNo.trim() !== '' &&
       selectedSize !== '' &&
       weightKg !== '' &&
-      rejectedKg !== '' &&
-      duplesPkt !== '' &&
-      cartonCtn !== ''
-    );
-  }, [date, selectedFamily, selectedType, batchNo, selectedSize, weightKg, rejectedKg, duplesPkt, cartonCtn]);
+      cartonCtn !== '';
+      
+    if (entryType === 'dispatch') return commonValid;
+    return commonValid && rejectedKg !== '' && duplesPkt !== '';
+  }, [date, selectedFamily, selectedType, batchNo, selectedSize, weightKg, rejectedKg, duplesPkt, cartonCtn, entryType]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -127,12 +129,13 @@ export const DataEntry: React.FC<DataEntryProps> = ({ onSave, onCancel, initialD
       batchNo: batchNo.toUpperCase(),
       size: selectedSize,
       weightKg: Number(weightKg),
-      rejectedKg: Number(rejectedKg),
-      duplesPkt: Number(duplesPkt),
+      rejectedKg: entryType === 'dispatch' ? 0 : Number(rejectedKg),
+      duplesPkt: entryType === 'dispatch' ? 0 : Number(duplesPkt),
       cartonCtn: Number(cartonCtn),
       notes: notes,
       timestamp: initialData ? initialData.timestamp : Date.now(),
-      isReturn: isReturn
+      isReturn: entryType === 'return',
+      isDispatch: entryType === 'dispatch'
     };
 
     onSave(newRecord);
@@ -141,32 +144,35 @@ export const DataEntry: React.FC<DataEntryProps> = ({ onSave, onCancel, initialD
   const families = getFamilies();
   const availableTypes = selectedFamily ? getTypesForFamily(selectedFamily) : [];
 
+  const themeClass = entryType === 'dispatch' ? 'bg-red-600' : entryType === 'return' ? 'bg-orange-600' : 'bg-blue-600';
+  const textMutedClass = entryType === 'dispatch' ? 'text-red-100' : entryType === 'return' ? 'text-orange-100' : 'text-blue-100';
+
   return (
     <div className="max-w-3xl mx-auto bg-white rounded-xl shadow-md overflow-hidden border border-gray-200">
-      <div className={`${isReturn ? 'bg-orange-600' : 'bg-blue-600'} px-6 py-4 transition-colors duration-300`}>
-        <div className="flex justify-between items-center">
-            <div>
+      <div className={`${themeClass} px-6 py-4 transition-colors duration-300`}>
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="w-full md:w-auto">
                 <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                  {isReturn 
-                    ? <><RotateCcw className="text-orange-200" /> {initialData ? 'Edit Return Entry' : 'New Sales Return'}</>
-                    : (initialData ? 'Edit Ledger Entry' : 'New Ledger Entry')
-                  }
+                  {entryType === 'dispatch' ? (
+                    <><Truck className="text-red-200" /> {initialData ? 'Edit Dispatch' : 'Manual Dispatch'}</>
+                  ) : entryType === 'return' ? (
+                    <><RotateCcw className="text-orange-200" /> {initialData ? 'Edit Return' : 'New Sales Return'}</>
+                  ) : (
+                    <>{initialData ? 'Edit Ledger Entry' : 'New Ledger Entry'}</>
+                  )}
                 </h2>
-                <p className={`${isReturn ? 'text-orange-100' : 'text-blue-100'} text-sm`}>
-                  {isReturn 
-                    ? "Record material returned by customer (Adds to stock)" 
-                    : "Enter production data from Yadav's ledger"
-                  }
+                <p className={`${textMutedClass} text-sm`}>
+                  {entryType === 'dispatch' ? "Record out-going stock to customer" : entryType === 'return' ? "Record material returned by customer" : "Enter daily production data"}
                 </p>
             </div>
             
-            {/* Toggle Switch */}
-            <div className="flex items-center gap-1 bg-white/20 p-1 rounded-lg backdrop-blur-sm">
+            {/* Multi-Tab Toggle Switch */}
+            <div className="flex items-center gap-1 bg-white/20 p-1 rounded-lg backdrop-blur-sm w-full md:w-auto">
                 <button
                     type="button"
-                    onClick={() => setIsReturn(false)}
-                    className={`px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition-all ${
-                        !isReturn 
+                    onClick={() => setEntryType('production')}
+                    className={`flex-1 md:flex-none px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${
+                        entryType === 'production' 
                         ? 'bg-white text-blue-700 shadow-sm' 
                         : 'text-white hover:bg-white/10'
                     }`}
@@ -175,14 +181,25 @@ export const DataEntry: React.FC<DataEntryProps> = ({ onSave, onCancel, initialD
                 </button>
                 <button
                     type="button"
-                    onClick={() => setIsReturn(true)}
-                    className={`px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition-all ${
-                        isReturn 
+                    onClick={() => setEntryType('return')}
+                    className={`flex-1 md:flex-none px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${
+                        entryType === 'return' 
                         ? 'bg-white text-orange-700 shadow-sm' 
                         : 'text-white hover:bg-white/10'
                     }`}
                 >
                     Return
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setEntryType('dispatch')}
+                    className={`flex-1 md:flex-none px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${
+                        entryType === 'dispatch' 
+                        ? 'bg-white text-red-700 shadow-sm' 
+                        : 'text-white hover:bg-white/10'
+                    }`}
+                >
+                    Dispatch
                 </button>
             </div>
         </div>
@@ -194,21 +211,21 @@ export const DataEntry: React.FC<DataEntryProps> = ({ onSave, onCancel, initialD
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              {isReturn ? "Return Date" : "Production Date"}
+              {entryType === 'dispatch' ? 'Dispatch Date' : entryType === 'return' ? 'Return Date' : 'Production Date'}
             </label>
             <input
               type="date"
               required
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 outline-none ${isReturn ? 'focus:ring-orange-500' : 'focus:ring-blue-500'}`}
+              className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 outline-none ${entryType === 'dispatch' ? 'focus:ring-red-500' : entryType === 'return' ? 'focus:ring-orange-500' : 'focus:ring-blue-500'}`}
             />
           </div>
         </div>
 
         {/* 2. Product Name (Family & Type) */}
         <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
-          <label className="block text-xs font-bold text-gray-50 uppercase mb-2">Product Name</label>
+          <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Product Selection</label>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <select
@@ -218,7 +235,7 @@ export const DataEntry: React.FC<DataEntryProps> = ({ onSave, onCancel, initialD
                   setSelectedType('');
                   setSelectedSize('');
                 }}
-                className={`w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 outline-none ${isReturn ? 'focus:ring-orange-500' : 'focus:ring-blue-500'}`}
+                className={`w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 outline-none ${entryType === 'dispatch' ? 'focus:ring-red-500' : entryType === 'return' ? 'focus:ring-orange-500' : 'focus:ring-blue-500'}`}
               >
                 <option value="">Select Family</option>
                 {families.map(f => <option key={f} value={f}>{f}</option>)}
@@ -229,7 +246,7 @@ export const DataEntry: React.FC<DataEntryProps> = ({ onSave, onCancel, initialD
                 value={selectedType}
                 onChange={(e) => setSelectedType(e.target.value)}
                 disabled={!selectedFamily}
-                className={`w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 disabled:text-gray-400 ${isReturn ? 'focus:ring-orange-500' : 'focus:ring-blue-500'}`}
+                className={`w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 disabled:text-gray-400 ${entryType === 'dispatch' ? 'focus:ring-red-500' : entryType === 'return' ? 'focus:ring-orange-500' : 'focus:ring-blue-500'}`}
               >
                 <option value="">Select Type</option>
                 {availableTypes.map(def => (
@@ -241,8 +258,8 @@ export const DataEntry: React.FC<DataEntryProps> = ({ onSave, onCancel, initialD
             </div>
           </div>
           {activeDef && (
-            <div className={`mt-2 text-xs font-medium px-1 ${isReturn ? 'text-orange-600' : 'text-blue-600'}`}>
-              Selected: {activeDef.displayName}
+            <div className={`mt-2 text-xs font-medium px-1 ${entryType === 'dispatch' ? 'text-red-600' : entryType === 'return' ? 'text-orange-600' : 'text-blue-600'}`}>
+              Item: {activeDef.displayName}
             </div>
           )}
         </div>
@@ -250,14 +267,16 @@ export const DataEntry: React.FC<DataEntryProps> = ({ onSave, onCancel, initialD
         {/* 3. Batch No & 4. Size */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Batch No</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              {entryType === 'dispatch' ? 'Batch / INV No' : 'Batch No'}
+            </label>
             <input
               type="text"
               required
-              placeholder="e.g. B-001"
+              placeholder={entryType === 'dispatch' ? 'e.g. INV-101' : 'e.g. B-001'}
               value={batchNo}
               onChange={(e) => setBatchNo(e.target.value)}
-              className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 outline-none uppercase ${isReturn ? 'focus:ring-orange-500' : 'focus:ring-blue-500'}`}
+              className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 outline-none uppercase ${entryType === 'dispatch' ? 'focus:ring-red-500' : entryType === 'return' ? 'focus:ring-orange-500' : 'focus:ring-blue-500'}`}
             />
           </div>
           <div>
@@ -266,7 +285,7 @@ export const DataEntry: React.FC<DataEntryProps> = ({ onSave, onCancel, initialD
               value={selectedSize}
               onChange={(e) => setSelectedSize(e.target.value)}
               disabled={!activeDef}
-              className={`w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 disabled:text-gray-400 ${isReturn ? 'focus:ring-orange-500' : 'focus:ring-blue-500'}`}
+              className={`w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 disabled:text-gray-400 ${entryType === 'dispatch' ? 'focus:ring-red-500' : entryType === 'return' ? 'focus:ring-orange-500' : 'focus:ring-blue-500'}`}
             >
               <option value="">Select Size</option>
               {activeDef?.sizes.map(s => <option key={s} value={s}>{s}</option>)}
@@ -285,7 +304,7 @@ export const DataEntry: React.FC<DataEntryProps> = ({ onSave, onCancel, initialD
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                 {isReturn ? "Returned Good Weight (Kgs)" : "Weight in Kgs"}
+                 {entryType === 'dispatch' ? "Dispatch Weight (Kgs)" : entryType === 'return' ? "Returned Good Weight (Kgs)" : "Good Weight (Kgs)"}
               </label>
               <div className="relative">
                 <input
@@ -295,50 +314,56 @@ export const DataEntry: React.FC<DataEntryProps> = ({ onSave, onCancel, initialD
                   step="0.01"
                   value={weightKg}
                   onChange={(e) => setWeightKg(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none font-bold text-gray-800"
+                  className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 outline-none font-bold text-gray-800 ${entryType === 'dispatch' ? 'focus:ring-red-500' : 'focus:ring-green-500'}`}
                 />
                 {suggestions && (
-                  <div className="absolute right-3 top-2.5 flex items-center gap-1 text-xs text-green-600 font-bold bg-green-50 px-2 py-0.5 rounded">
+                  <div className="absolute right-3 top-2.5 flex items-center gap-1 text-xs text-gray-400 font-bold bg-gray-50 px-2 py-0.5 rounded">
                     <Layers size={12} />
                     <span>≈ {suggestions.pallet.toFixed(2)} Pallets</span>
                   </div>
                 )}
               </div>
            </div>
-           <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                 {isReturn ? "Returned as Rejected (Kgs)" : "Rejected in Kgs"}
-              </label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={rejectedKg}
-                onChange={(e) => setRejectedKg(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
-              />
-           </div>
+           {entryType !== 'dispatch' && (
+             <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                   {entryType === 'return' ? "Returned as Rejected (Kgs)" : "Rejected in Kgs"}
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={rejectedKg}
+                  onChange={(e) => setRejectedKg(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
+                />
+             </div>
+           )}
+           {entryType === 'dispatch' && (
+              <div className="flex flex-col justify-end">
+                  <div className="bg-red-50 text-red-600 p-2.5 rounded-lg border border-red-100 text-xs font-medium flex items-center gap-2">
+                    <Truck size={16} /> 
+                    <span>This will deduct weight from Finished Goods stock.</span>
+                  </div>
+              </div>
+           )}
         </div>
 
         {/* 7. Duples & 8. Carton */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-gray-50 p-4 rounded-xl border border-gray-200">
            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Duples (PKT)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {entryType === 'dispatch' ? 'Total Packets (Optional)' : 'Duples (PKT)'}
+              </label>
               <div className="relative">
                 <input
                   type="number"
                   min="0"
                   value={duplesPkt}
                   onChange={(e) => setDuplesPkt(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                  className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 outline-none ${isReturn ? 'focus:ring-orange-500' : 'focus:ring-blue-500'}`}
+                  className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 outline-none ${entryType === 'dispatch' ? 'focus:ring-red-500' : entryType === 'return' ? 'focus:ring-orange-500' : 'focus:ring-blue-500'}`}
                 />
-                 {activeDef && duplesPkt !== '' && (
-                    <div className="absolute right-3 top-2.5 text-xs text-gray-400">
-                      Inside CTN
-                    </div>
-                  )}
               </div>
-              {/* Tentative Pkt Display */}
               {suggestions && (
                 <div className="mt-1 flex items-center gap-1 text-xs text-amber-600 font-medium animate-pulse">
                   <Info size={12} />
@@ -347,17 +372,18 @@ export const DataEntry: React.FC<DataEntryProps> = ({ onSave, onCancel, initialD
               )}
            </div>
            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Carton (CTN)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {entryType === 'dispatch' ? 'Total Cartons' : 'Carton (CTN)'}
+              </label>
               <div className="relative">
                 <input
                   type="number"
                   min="0"
                   value={cartonCtn}
                   onChange={(e) => setCartonCtn(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                  className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 outline-none font-semibold ${isReturn ? 'focus:ring-orange-500' : 'focus:ring-blue-500'}`}
+                  className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 outline-none font-semibold ${entryType === 'dispatch' ? 'focus:ring-red-500' : entryType === 'return' ? 'focus:ring-orange-500' : 'focus:ring-blue-500'}`}
                 />
               </div>
-               {/* Tentative CTN Display */}
                {suggestions && (
                 <div className="mt-1 flex items-center gap-1 text-xs text-amber-600 font-medium animate-pulse">
                   <Info size={12} />
@@ -369,13 +395,15 @@ export const DataEntry: React.FC<DataEntryProps> = ({ onSave, onCancel, initialD
 
         {/* Notes */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Remarks</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            {entryType === 'dispatch' ? 'Customer / Destination' : 'Remarks'}
+          </label>
           <textarea
             rows={2}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 outline-none ${isReturn ? 'focus:ring-orange-500' : 'focus:ring-blue-500'}`}
-            placeholder={isReturn ? "Reason for return..." : ""}
+            className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 outline-none ${entryType === 'dispatch' ? 'focus:ring-red-500' : entryType === 'return' ? 'focus:ring-orange-500' : 'focus:ring-blue-500'}`}
+            placeholder={entryType === 'dispatch' ? "e.g. Al-Nassr Construction Co." : entryType === 'return' ? "Reason for return..." : ""}
           />
         </div>
 
@@ -394,14 +422,16 @@ export const DataEntry: React.FC<DataEntryProps> = ({ onSave, onCancel, initialD
             disabled={!isFormValid}
             className={`px-6 py-2 rounded-lg font-medium flex items-center gap-2 shadow-lg transition-all ${
               isFormValid 
-                ? isReturn 
-                   ? 'bg-orange-600 text-white hover:bg-orange-700 hover:scale-105 shadow-orange-600/20' 
-                   : 'bg-blue-600 text-white hover:bg-blue-700 hover:scale-105 shadow-blue-600/20'
+                ? entryType === 'dispatch'
+                   ? 'bg-red-600 text-white hover:bg-red-700 hover:scale-105 shadow-red-600/20'
+                   : entryType === 'return' 
+                      ? 'bg-orange-600 text-white hover:bg-orange-700 hover:scale-105 shadow-orange-600/20' 
+                      : 'bg-blue-600 text-white hover:bg-blue-700 hover:scale-105 shadow-blue-600/20'
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none'
             }`}
           >
             <Save size={18} />
-            {initialData ? 'Update Entry' : (isReturn ? 'Save Return' : 'Save Entry')}
+            {initialData ? 'Update Entry' : (entryType === 'dispatch' ? 'Save Dispatch' : entryType === 'return' ? 'Save Return' : 'Save Entry')}
           </button>
         </div>
       </form>
