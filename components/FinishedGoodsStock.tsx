@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { Warehouse, Download, Search, Info, Calendar, User, Package, Box } from 'lucide-react';
+import { Warehouse, Download, Search, Info, Calendar, User, Package, Box, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ProductionRecord, SalesOrder } from '../types';
 
 interface FinishedGoodsStockProps {
@@ -15,7 +15,7 @@ interface FGDetail {
   info?: string;
 }
 
-// Master Data provided (Opening Balance as of Nov 30)
+// Opening Balance as of Nov 30 (Master Start Point)
 const MASTER_FINISHED_GOODS = [
   { product: 'SPARKWELD 6013', size: '2.6 x 350', opening: 2214 },
   { product: 'SPARKWELD 6013', size: '3.2 x 350', opening: 4204 },
@@ -72,6 +72,7 @@ const MASTER_FINISHED_GOODS = [
 
 export const FinishedGoodsStock: React.FC<FinishedGoodsStockProps> = ({ records = [], orders = [] }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [hoveredBreakdown, setHoveredBreakdown] = useState<{
     x: number;
     y: number;
@@ -80,7 +81,7 @@ export const FinishedGoodsStock: React.FC<FinishedGoodsStockProps> = ({ records 
     type: 'PRODUCTION' | 'RETURN' | 'DESPATCH';
   } | null>(null);
 
-  // Helper to normalize strings for comparison (remove spaces, lowercase)
+  // Helper to normalize strings for comparison
   const normalize = (str: string) => str.toLowerCase().replace(/\s/g, '');
 
   const tableData = useMemo(() => {
@@ -88,40 +89,70 @@ export const FinishedGoodsStock: React.FC<FinishedGoodsStockProps> = ({ records 
       const normName = normalize(item.product);
       const normSize = normalize(item.size);
 
-      // 1. Production Breakdown
+      // --- CALCULATE OPENING BALANCE AS OF START OF SELECTED DATE ---
+      // This is: Master Opening (Nov 30) + All activity from Dec 1st until (selectedDate - 1)
+      
+      const prevProduction = records
+        .filter(r => normalize(r.productName) === normName && normalize(r.size) === normSize && !r.isReturn && !r.isDispatch && r.date < selectedDate)
+        .reduce((sum, r) => sum + r.weightKg, 0);
+
+      const prevReturn = records
+        .filter(r => normalize(r.productName) === normName && normalize(r.size) === normSize && r.isReturn && r.date < selectedDate)
+        .reduce((sum, r) => sum + r.weightKg, 0);
+
+      const prevManualDispatch = records
+        .filter(r => normalize(r.productName) === normName && normalize(r.size) === normSize && r.isDispatch && r.date < selectedDate)
+        .reduce((sum, r) => sum + r.weightKg, 0);
+
+      const prevOrderDispatch = orders
+        .filter(o => (o.status === 'Dispatched' || o.status === 'Delivered') && o.orderDate < selectedDate)
+        .reduce((orderSum, order) => {
+           return orderSum + order.items
+             .filter(i => normalize(i.productName) === normName && normalize(i.size) === normSize)
+             .reduce((iSum, i) => iSum + i.calculatedWeightKg, 0);
+        }, 0);
+
+      const openingBalance = item.opening + prevProduction + prevReturn - prevManualDispatch - prevOrderDispatch;
+
+      // --- CALCULATE ACTIVITY FOR EXACT SELECTED DATE ---
+
+      // 1. Production
       const productionBreakdown: FGDetail[] = records
         .filter(r => 
           normalize(r.productName) === normName && 
           normalize(r.size) === normSize && 
-          !r.isReturn && !r.isDispatch
+          !r.isReturn && !r.isDispatch &&
+          r.date === selectedDate
         )
         .map(r => ({ date: r.date, reference: r.batchNo, qty: r.weightKg }));
 
       const productionQty = productionBreakdown.reduce((sum, b) => sum + b.qty, 0);
 
-      // 2. Returns Breakdown
+      // 2. Returns
       const returnBreakdown: FGDetail[] = records
         .filter(r => 
           normalize(r.productName) === normName && 
           normalize(r.size) === normSize && 
-          r.isReturn
+          r.isReturn &&
+          r.date === selectedDate
         )
         .map(r => ({ date: r.date, reference: r.batchNo, qty: r.weightKg, info: r.notes }));
 
       const returnQty = returnBreakdown.reduce((sum, b) => sum + b.qty, 0);
 
-      // 3. Despatch Breakdown (Sales Orders + Manual Dispatches)
+      // 3. Despatch
       const manualDispatchBreakdown: FGDetail[] = records
         .filter(r => 
           normalize(r.productName) === normName && 
           normalize(r.size) === normSize && 
-          r.isDispatch
+          r.isDispatch &&
+          r.date === selectedDate
         )
         .map(r => ({ date: r.date, reference: r.batchNo, qty: r.weightKg, info: r.notes }));
 
       const orderDispatchBreakdown: FGDetail[] = [];
       orders
-        .filter(o => o.status === 'Dispatched' || o.status === 'Delivered')
+        .filter(o => (o.status === 'Dispatched' || o.status === 'Delivered') && o.orderDate === selectedDate)
         .forEach(order => {
            order.items
              .filter(i => normalize(i.productName) === normName && normalize(i.size) === normSize)
@@ -140,39 +171,46 @@ export const FinishedGoodsStock: React.FC<FinishedGoodsStockProps> = ({ records 
 
       return {
         ...item,
+        dynamicOpening: openingBalance,
         production: productionQty,
         productionBreakdown,
         return: returnQty,
         returnBreakdown,
         despatch: despatchQty,
         despatchBreakdown,
-        currentStock: item.opening + productionQty + returnQty - despatchQty
+        currentStock: openingBalance + productionQty + returnQty - despatchQty
       };
     });
-  }, [records, orders]);
+  }, [records, orders, selectedDate]);
 
   const filteredData = tableData.filter(item => 
     item.product.toLowerCase().includes(searchTerm.toLowerCase()) || 
     item.size.includes(searchTerm)
   );
 
-  const totalOpening = filteredData.reduce((acc, curr) => acc + curr.opening, 0);
+  const totalOpening = filteredData.reduce((acc, curr) => acc + curr.dynamicOpening, 0);
   const totalProduction = filteredData.reduce((acc, curr) => acc + curr.production, 0);
   const totalReturn = filteredData.reduce((acc, curr) => acc + curr.return, 0);
   const totalDespatch = filteredData.reduce((acc, curr) => acc + curr.despatch, 0);
   const totalStock = filteredData.reduce((acc, curr) => acc + curr.currentStock, 0);
 
+  const adjustDate = (days: number) => {
+    const d = new Date(selectedDate);
+    d.setDate(d.getDate() + days);
+    setSelectedDate(d.toISOString().split('T')[0]);
+  };
+
   const handleExport = () => {
-    const headers = ["Product", "Size", "Available Qty/kgs (Opening)", "Production", "Return", "Despatch", "Stock/kgs"];
+    const headers = ["Product", "Size", `BF Qty (${selectedDate})`, "Production", "Return", "Despatch", "Closing Stock"];
     const rows = filteredData.map(r => [
-      `"${r.product}"`, r.size, r.opening, r.production, r.return, r.despatch, r.currentStock
+      `"${r.product}"`, r.size, r.dynamicOpening, r.production, r.return, r.despatch, r.currentStock
     ]);
     const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
     const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `FG_Stock_Report_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `FG_Stock_Report_${selectedDate}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -188,7 +226,7 @@ export const FinishedGoodsStock: React.FC<FinishedGoodsStockProps> = ({ records 
           </div>
           <div>
             <h2 className="text-xl font-bold text-gray-800">Finished Goods Stock</h2>
-            <p className="text-sm text-gray-500">Live Inventory Management</p>
+            <p className="text-sm text-gray-500">Live Inventory Performance</p>
           </div>
         </div>
 
@@ -197,7 +235,7 @@ export const FinishedGoodsStock: React.FC<FinishedGoodsStockProps> = ({ records 
              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
              <input 
                type="text" 
-               placeholder="Search product or size..." 
+               placeholder="Search product..." 
                value={searchTerm}
                onChange={(e) => setSearchTerm(e.target.value)}
                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg w-full outline-none focus:ring-2 focus:ring-emerald-500"
@@ -212,15 +250,33 @@ export const FinishedGoodsStock: React.FC<FinishedGoodsStockProps> = ({ records 
         </div>
       </div>
 
-      {/* Excel Table Container */}
+      {/* Styled Excel Table Container */}
       <div className="bg-white shadow-lg border border-gray-300 overflow-hidden relative">
         <div className="bg-[#4472c4] text-white text-center py-2 font-bold text-lg border-b border-gray-400 uppercase tracking-wider">
-          Finished Goods Stock Report
+          Finished Goods Daily Stock Report
         </div>
         
-        <div className="bg-white border-b border-black flex justify-end px-4 py-1">
-          <div className="bg-yellow-300 border border-black px-4 py-1 font-bold text-black text-xs">
-             Date: {new Date().toLocaleDateString('en-GB')}
+        {/* Date Selector Row */}
+        <div className="bg-white border-b border-black flex justify-between items-center px-4 py-2">
+          <div className="flex items-center gap-2">
+             <button onClick={() => adjustDate(-1)} className="p-1 hover:bg-gray-100 rounded text-gray-500 transition-colors">
+               <ChevronLeft size={20} />
+             </button>
+             <div className="relative">
+                <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 text-emerald-600" size={16} />
+                <input 
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="pl-9 pr-3 py-1 border border-emerald-200 rounded font-bold text-emerald-800 text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-emerald-50/30"
+                />
+             </div>
+             <button onClick={() => adjustDate(1)} className="p-1 hover:bg-gray-100 rounded text-gray-500 transition-colors">
+               <ChevronRight size={20} />
+             </button>
+          </div>
+          <div className="bg-yellow-300 border border-black px-4 py-1 font-black text-black text-xs uppercase tracking-tighter">
+             Report Date: {new Date(selectedDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
           </div>
         </div>
 
@@ -230,11 +286,11 @@ export const FinishedGoodsStock: React.FC<FinishedGoodsStockProps> = ({ records 
                <tr className="text-black uppercase">
                  <th className="bg-[#70ad47] border border-black px-3 py-2 text-left font-bold">Product</th>
                  <th className="bg-[#70ad47] border border-black px-3 py-2 text-center font-bold w-32">Size</th>
-                 <th className="bg-[#70ad47] border border-black px-3 py-2 text-right font-bold w-32">BF Qty<br/><span className="text-[10px] font-normal">(Nov 30)</span></th>
+                 <th className="bg-[#70ad47] border border-black px-3 py-2 text-right font-bold w-32">BF Qty<br/><span className="text-[10px] font-normal italic">Opening</span></th>
                  <th className="bg-[#70ad47] border border-black px-3 py-2 text-right font-bold w-24">Production</th>
                  <th className="bg-[#70ad47] border border-black px-3 py-2 text-right font-bold w-24">Return</th>
                  <th className="bg-[#70ad47] border border-black px-3 py-2 text-right font-bold w-24">Despatch</th>
-                 <th className="bg-[#70ad47] border border-black px-3 py-2 text-right font-bold w-32 bg-amber-500">Stock/kgs</th>
+                 <th className="bg-[#70ad47] border border-black px-3 py-2 text-right font-bold w-32 bg-amber-500">Closing</th>
                </tr>
             </thead>
             <tbody>
@@ -247,7 +303,7 @@ export const FinishedGoodsStock: React.FC<FinishedGoodsStockProps> = ({ records 
                       {row.size}
                     </td>
                     <td className="border border-black px-3 py-1 text-right font-bold bg-[#e2efda] text-black">
-                      {row.opening.toLocaleString()}
+                      {row.dynamicOpening.toLocaleString()}
                     </td>
                     
                     {/* Production Breakdown Trigger */}
@@ -297,7 +353,7 @@ export const FinishedGoodsStock: React.FC<FinishedGoodsStockProps> = ({ records 
                
                {/* Grand Total Row */}
                <tr className="bg-yellow-100 font-bold border-t-2 border-black text-black">
-                  <td className="border border-black px-3 py-2 text-right" colSpan={2}>Grand Total:</td>
+                  <td className="border border-black px-3 py-2 text-right" colSpan={2}>Grand Total Activity:</td>
                   <td className="border border-black px-3 py-2 text-right">{totalOpening.toLocaleString()}</td>
                   <td className="border border-black px-3 py-2 text-right text-blue-700">{totalProduction.toLocaleString()}</td>
                   <td className="border border-black px-3 py-2 text-right text-orange-600">{totalReturn.toLocaleString()}</td>
@@ -324,25 +380,22 @@ export const FinishedGoodsStock: React.FC<FinishedGoodsStockProps> = ({ records 
             hoveredBreakdown.type === 'RETURN' ? 'bg-orange-700' : 'bg-red-700'
           } text-white px-3 py-1.5 font-bold flex justify-between`}>
              <span className="truncate w-48">{hoveredBreakdown.title}</span>
-             <span>{hoveredBreakdown.type} LOG</span>
+             <span>{hoveredBreakdown.type} ON {selectedDate}</span>
           </div>
           <div className="max-h-60 overflow-y-auto">
              <table className="w-full">
                 <thead className="bg-gray-100 text-gray-800 border-b border-black">
                    <tr>
-                      <th className="px-2 py-1 text-left font-bold">Date</th>
                       <th className="px-2 py-1 text-left font-bold">Ref / Batch</th>
                       <th className="px-2 py-1 text-right font-bold">Weight</th>
                    </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                    {hoveredBreakdown.data
-                     .sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime())
                      .map((entry, idx) => (
                       <tr key={idx} className="hover:bg-yellow-50">
-                         <td className="px-2 py-1 text-gray-800 whitespace-nowrap">{entry.date}</td>
-                         <td className="px-2 py-1 font-mono text-gray-600 truncate max-w-[120px]">
-                           <div>{entry.reference}</div>
+                         <td className="px-2 py-1 font-mono text-gray-600 truncate">
+                           <div className="font-bold text-gray-900">{entry.reference}</div>
                            {entry.info && <div className="text-[9px] text-blue-500 font-bold uppercase truncate">{entry.info}</div>}
                          </td>
                          <td className={`px-2 py-1 text-right font-bold ${
@@ -354,8 +407,8 @@ export const FinishedGoodsStock: React.FC<FinishedGoodsStockProps> = ({ records 
                 </tbody>
              </table>
           </div>
-          <div className="bg-gray-50 px-3 py-1 border-t border-black text-right font-bold text-black">
-             Total: {hoveredBreakdown.data.reduce((acc, curr) => acc + curr.qty, 0).toLocaleString()} Kg
+          <div className="bg-gray-50 px-3 py-1 border-t border-black text-right font-bold text-black uppercase tracking-tighter">
+             Total for Day: {hoveredBreakdown.data.reduce((acc, curr) => acc + curr.qty, 0).toLocaleString()} Kg
           </div>
         </div>
       )}
