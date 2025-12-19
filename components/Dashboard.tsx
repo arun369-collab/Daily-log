@@ -24,32 +24,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ records }) => {
     return `${parts[2]}-${parts[1]}-${parts[0]}`;
   };
 
-  // Memoized computations for performance
   const stats = useMemo(() => {
-    // ONLY count production (Exclude dispatch and returns from production volume)
     const prodRecords = records.filter(r => !r.isDispatch && !r.isReturn);
-    
     const totalWeight = prodRecords.reduce((acc, r) => acc + r.weightKg, 0);
     const totalRejected = prodRecords.reduce((acc, r) => acc + r.rejectedKg, 0);
     const totalCartons = prodRecords.reduce((acc, r) => acc + r.cartonCtn, 0);
-    
-    // Pallets Calculation: 1000kg = 1 Pallet
     const totalPallets = totalWeight / 1000;
-
-    // Rejection Rate Calculation
     const totalProcessed = totalWeight + totalRejected;
     const rejectionRate = totalProcessed > 0 ? ((totalRejected / totalProcessed) * 100).toFixed(2) : "0.00";
-    
-    // Unique Batches
     const uniqueBatches = new Set(prodRecords.map(r => r.batchNo)).size;
-
     return { totalWeight, totalRejected, totalCartons, rejectionRate, uniqueBatches, totalPallets };
   }, [records]);
 
   const chartData = useMemo(() => {
-    // Group by Date for the chart - PRODUCTION ONLY
     const prodRecords = records.filter(r => !r.isDispatch && !r.isReturn);
-    
     const grouped = prodRecords.reduce((acc, curr) => {
       const existing = acc.find(item => item.date === curr.date);
       if (existing) {
@@ -60,14 +48,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ records }) => {
       }
       return acc;
     }, [] as { date: string, weightKg: number, rejectedKg: number }[]);
-
-    // Sort by date and take last 7 days
     return grouped.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).slice(-7);
+  }, [records]);
+
+  // Ascending Sorted display list from Dec 1st
+  const sortedDisplayList = useMemo(() => {
+    return [...records]
+      .filter(r => r.date >= '2025-12-01')
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [records]);
 
   const handleGenerateInsight = async () => {
     setLoadingAi(true);
-    // Insight should probably know about both, but let's focus on production for now
     const insight = await generateProductionInsight(records.filter(r => !r.isDispatch));
     setAiSummary(insight);
     setLoadingAi(false);
@@ -75,7 +67,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ records }) => {
 
   return (
     <div className="space-y-6">
-      {/* KPI Stats Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard 
           title="Total Production (Kg)" 
@@ -108,9 +99,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ records }) => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Charts Column */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Production Trend Chart */}
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-800">Production Weight vs Rejections</h3>
@@ -131,10 +120,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ records }) => {
             </div>
           </div>
           
-          {/* Recent Activity Mini Table */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
              <div className="px-6 py-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-                <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Recent Floor Entries</h3>
+                <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Floor Entries (Ascending)</h3>
              </div>
              <div className="overflow-x-auto">
                <table className="w-full text-sm text-left">
@@ -148,7 +136,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ records }) => {
                    </tr>
                  </thead>
                  <tbody className="divide-y divide-gray-100">
-                    {records.slice(0, 5).map(r => (
+                    {sortedDisplayList.slice(0, 15).map(r => (
                       <tr key={r.id} className="hover:bg-gray-50">
                         <td className="px-6 py-3">{formatDisplayDate(r.date)}</td>
                         <td className="px-6 py-3 font-mono text-xs text-gray-600">{r.batchNo}</td>
@@ -168,29 +156,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ records }) => {
                         <td className="px-6 py-3 text-right font-bold">{r.weightKg.toFixed(2)}</td>
                       </tr>
                     ))}
-                    {records.length === 0 && (
-                      <tr>
-                        <td colSpan={5} className="px-6 py-8 text-center text-gray-400">No entries found.</td>
-                      </tr>
-                    )}
                  </tbody>
                </table>
              </div>
           </div>
         </div>
 
-        {/* AI Insight Column */}
         <div className="lg:col-span-1">
           <div className="bg-gradient-to-br from-indigo-900 to-purple-900 rounded-xl shadow-lg text-white p-6 h-full flex flex-col">
             <div className="flex items-center gap-2 mb-4">
               <Sparkles className="text-yellow-400" />
               <h3 className="text-xl font-bold">Daily Summary AI</h3>
             </div>
-            
-            <p className="text-indigo-200 text-sm mb-6">
-              Generate a summary of manufacturing performance. Identifies volume trends, quality issues, and efficiency.
-            </p>
-
+            <p className="text-indigo-200 text-sm mb-6">Analyze performance since Dec 1st.</p>
             <div className="flex-1 bg-white/10 rounded-lg p-4 text-sm leading-relaxed overflow-y-auto max-h-[400px]">
               {loadingAi ? (
                 <div className="flex flex-col items-center justify-center h-full text-indigo-200 gap-2">
@@ -207,7 +185,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ records }) => {
                 </div>
               )}
             </div>
-
             <button
               onClick={handleGenerateInsight}
               disabled={loadingAi || records.length === 0}

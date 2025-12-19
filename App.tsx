@@ -85,7 +85,6 @@ function App() {
       }
     }
     
-    // Initial Load & Sync
     loadData();
     if (isSyncEnabled()) {
       handleSyncDown();
@@ -102,7 +101,7 @@ function App() {
     setSyncStatus('syncing');
     const success = await syncDown();
     if (success) {
-      loadData(); // Reload from storage after import
+      loadData(); 
       setSyncStatus('success');
       setTimeout(() => setSyncStatus('idle'), 3000);
     } else {
@@ -113,7 +112,7 @@ function App() {
 
   const triggerSyncUp = async () => {
     setSyncStatus('syncing');
-    await syncUp(); // Fire and forget mostly, but we show status
+    await syncUp(); 
     setSyncStatus('success');
     setTimeout(() => setSyncStatus('idle'), 3000);
   };
@@ -130,7 +129,6 @@ function App() {
     else if (role === 'sales') setView('sales_dashboard');
     else setView('dashboard');
     
-    // Attempt sync on login
     if (isSyncEnabled()) handleSyncDown();
   };
 
@@ -144,7 +142,6 @@ function App() {
     setUsername('Admin');
   };
 
-  // --- Production Record Handlers ---
   const handleSave = (record: ProductionRecord) => {
     const updated = saveRecord(record);
     setRecords(updated);
@@ -167,19 +164,21 @@ function App() {
     }
   };
 
-  // --- Filtered Records for Yadav ---
+  // --- Filtered & Sorted Records ---
   const displayRecords = useMemo(() => {
+    let filtered = records;
     if (userRole === 'yadav') {
-      return records.filter(r => !r.isReturn && !r.isDispatch);
+      filtered = records.filter(r => !r.isReturn && !r.isDispatch);
     }
-    return records;
+    // Filter from Dec 1st and sort Ascending
+    return filtered
+      .filter(r => r.date >= '2025-12-01')
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [records, userRole]);
 
-  // --- Sales Order Handlers ---
   const handleSaveOrder = (order: SalesOrder) => {
     const updated = saveSalesOrder(order);
     setSalesOrders(updated);
-    // Stay on view (SalesEntry handles close)
     setEditingOrder(null);
     triggerSyncUp();
   };
@@ -190,17 +189,13 @@ function App() {
     setIsMobileMenuOpen(false);
   };
   
-  // Refresh orders from local storage or trigger sync if needed
   const refreshOrders = (shouldSyncUp = false) => {
     setSalesOrders(getSalesOrders());
-    // If this refresh is triggered by a data mutation (delete/update status), we sync UP.
-    // If it's a manual refresh button, we might want to sync DOWN (but for now let's keep it safe).
     if (shouldSyncUp) {
       triggerSyncUp();
     }
   };
   
-  // Special handler for manual refresh button that pulls data
   const handleManualRefresh = () => {
     setSalesOrders(getSalesOrders());
     if (isSyncEnabled()) handleSyncDown();
@@ -244,7 +239,6 @@ function App() {
     </button>
   );
 
-  // Sync Indicator Component
   const SyncIndicator = () => {
     if (!isSyncEnabled()) return null;
     return (
@@ -276,12 +270,10 @@ function App() {
     );
   };
 
-  // If not authenticated, show Login screen
   if (!isAuthenticated) {
     return <Login onLogin={handleLogin} />;
   }
 
-  // Permission Check Helper
   const canAccess = (feature: ViewState) => {
     if (userRole === 'admin') return true;
     if (userRole === 'yadav') return ['dashboard', 'entry', 'ledger_sheet', 'packing_stock', 'analytics', 'batches'].includes(feature);
@@ -292,7 +284,6 @@ function App() {
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-[#f3f4f6] print:bg-white print:block print:h-auto print:min-h-0 print:overflow-visible">
       
-      {/* Mobile Top Header */}
       <div className="md:hidden bg-white shadow-sm px-4 py-3 flex justify-between items-center sticky top-0 z-20 print:hidden">
         <div className="flex items-center gap-2 text-blue-700 font-bold text-lg">
           <Factory className="text-blue-600" /> FactoryFlow
@@ -317,9 +308,7 @@ function App() {
         </div>
       </div>
 
-      {/* Desktop Sidebar Navigation */}
       <aside className="hidden md:flex sticky top-0 h-screen w-64 bg-white border-r border-gray-200 flex-col z-10 print:hidden overflow-hidden">
-        {/* Fixed Header */}
         <div className="p-6 pb-4">
           <div className="flex items-center gap-2 text-blue-700 font-bold text-2xl px-2">
             <Factory size={28} /> 
@@ -327,22 +316,17 @@ function App() {
           </div>
         </div>
 
-        {/* Scrollable Nav Area */}
         <nav className="space-y-2 flex-1 overflow-y-auto px-6 pb-4 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
           {canAccess('dashboard') && <NavItem target="dashboard" icon={LayoutDashboard} label="Dashboard" />}
           {canAccess('analytics') && <NavItem target="analytics" icon={PieChart} label="Analytics" />}
-          
           {canAccess('entry') && <NavItem target="entry" icon={PlusCircle} label="Add Ledger Entry" />}
           {canAccess('ledger_sheet') && <NavItem target="ledger_sheet" icon={FileText} label="Daily Report" />}
-          
           {canAccess('packing_stock') && <NavItem target="packing_stock" icon={Package} label="Packing Stock" />}
           {canAccess('finished_goods') && <NavItem target="finished_goods" icon={ClipboardList} label="Finished Goods" />}
-          
           {canAccess('batches') && <NavItem target="batches" icon={Archive} label="Batch Registry" />}
           {canAccess('dispatch') && <NavItem target="dispatch" icon={Truck} label="Dispatch Helper" />}
           {canAccess('history') && <NavItem target="history" icon={History} label="History" />}
 
-          {/* Sales Links */}
           {(canAccess('sales_dashboard') || canAccess('customers')) && (
             <div className="pt-4 mt-4 border-t border-gray-100">
                <p className="px-4 text-xs font-bold text-gray-400 uppercase mb-2">Sales</p>
@@ -354,15 +338,12 @@ function App() {
           )}
         </nav>
 
-        {/* Fixed Footer */}
         <div className="p-6 pt-4 border-t border-gray-100 space-y-2 bg-white">
            <div className="px-4 py-2 mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider flex justify-between items-center">
              <span>User: {username}</span>
              <SyncIndicator />
            </div>
-           
            {canAccess('settings') && <NavItem target="settings" icon={SettingsIcon} label="Settings" />}
-           
            <button
             onClick={handleLogout}
             className="flex items-center gap-3 px-4 py-3 rounded-lg w-full transition-all text-red-500 hover:bg-red-50"
@@ -373,7 +354,6 @@ function App() {
         </div>
       </aside>
 
-      {/* Main Content Area */}
       <main className="flex-1 p-4 md:p-8 overflow-x-hidden pb-24 md:pb-8 print:p-0 print:overflow-visible">
         <header className="mb-6 md:mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden">
           <div>
@@ -417,15 +397,10 @@ function App() {
           )}
 
           {canAccess('packing_stock') && view === 'packing_stock' && <PackingStock records={displayRecords} />}
-
           {canAccess('finished_goods') && view === 'finished_goods' && <FinishedGoodsStock records={records} orders={salesOrders} />}
-
           {canAccess('batches') && view === 'batches' && <BatchRegistry records={displayRecords} />}
-          
           {canAccess('ledger_sheet') && view === 'ledger_sheet' && <LedgerSheet records={displayRecords} />}
-          
           {canAccess('dispatch') && view === 'dispatch' && <DispatchAssistant records={records} />}
-
           {canAccess('settings') && view === 'settings' && <Settings onLogout={handleLogout} />}
 
           {canAccess('sales_dashboard') && view === 'sales_dashboard' && (
@@ -451,7 +426,6 @@ function App() {
           )}
 
           {canAccess('customers') && view === 'customers' && <CustomerDatabase />}
-
           {canAccess('customer_behaviour') && view === 'customer_behaviour' && <CustomerBehaviour orders={salesOrders} />}
 
           {canAccess('history') && view === 'history' && (
@@ -510,9 +484,7 @@ function App() {
         </div>
       </main>
 
-      {/* Mobile Bottom Navigation Bar */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-30 h-16 px-2 flex justify-between items-center print:hidden safe-area-pb">
-         
          {userRole === 'admin' && (
            <>
              <MobileNavIcon target="dashboard" icon={LayoutDashboard} label="Home" />
@@ -583,7 +555,6 @@ function App() {
          )}
       </nav>
 
-      {/* Full-screen Mobile Menu Overlay */}
       {isMobileMenuOpen && (
         <div className="md:hidden fixed inset-0 z-[100] bg-white animate-fadeIn flex flex-col">
           <div className="p-6 flex justify-between items-center border-b border-gray-100">
@@ -601,7 +572,6 @@ function App() {
 
           <div className="flex-1 overflow-y-auto p-6">
             <div className="grid grid-cols-2 gap-4">
-               {/* Core Items (Filtered by access) */}
                {canAccess('dashboard') && (
                  <button onClick={() => { setView('dashboard'); setIsMobileMenuOpen(false); }} className="flex flex-col items-center p-4 bg-blue-50 rounded-2xl text-blue-700">
                     <LayoutDashboard size={32} className="mb-2" />

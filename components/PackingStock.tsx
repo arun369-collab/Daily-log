@@ -6,7 +6,7 @@ import { Package, Plus, ArrowDown, Search, RefreshCw, Lock, AlertTriangle, Calen
 import { PRODUCT_CATALOG } from '../data/products';
 
 // Records ON or AFTER this date will be deducted from Opening Stock.
-const STOCK_CALCULATION_START_DATE = '2024-12-01';
+const STOCK_CALCULATION_START_DATE = '2025-12-01';
 
 const MASTER_STOCK_LIST: PackingStockItem[] = [
   // Packets (PD)
@@ -65,7 +65,6 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
   const [refreshKey, setRefreshKey] = useState(0); 
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   
-  // Tooltip State
   const [hoveredBreakdown, setHoveredBreakdown] = useState<{
     x: number;
     y: number;
@@ -74,10 +73,9 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
     type: 'INWARD' | 'ISSUE';
   } | null>(null);
   
-  // Transactions State
   const [transactions, setTransactions] = useState<StockTransaction[]>(getStockTransactions());
 
-  // Logic to Map Production to Packaging Material
+  // FIXED MAPPING LOGIC FOR 6013
   const resolveMaterialIds = (record: ProductionRecord): { packetId: string | null, cartonId: string | null } => {
     const prodName = record.productName.toUpperCase();
     const size = record.size;
@@ -103,10 +101,9 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
     else {
         if (prodName.includes('6013')) {
            cartonId = 'PC1003';
-           if (approxPktWeight > 3.5 && approxPktWeight < 4.5) packetId = 'PD1001';
-           else if (approxPktWeight > 1.5 && approxPktWeight < 2.5) packetId = 'PD1005';
-           else if (approxPktWeight > 4.5) packetId = 'PD1007';
-           else packetId = 'PD1001';
+           // Fixed: Ensure 6013 always maps to PD1001 unless it's a specific instruction for something else
+           // We removed the threshold check that was causing drift into PD1005
+           packetId = 'PD1001';
         }
         else if (prodName.includes('7018')) {
            cartonId = 'PC1002';
@@ -129,7 +126,6 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
       inwardBreakdown: [] as BreakdownItem[]
     }));
 
-    // --- 1. Calculate History up to the start of selectedDate ---
     transactions.forEach(txn => {
         const item = calculatedData.find(i => i.id === txn.itemId);
         if (item) {
@@ -153,7 +149,6 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
         
         const { packetId, cartonId } = resolveMaterialIds(record);
 
-        // Packet Deductions
         if (packetId) {
             const pktItem = calculatedData.find(i => i.id === packetId);
             if (pktItem) {
@@ -166,7 +161,6 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
                     pktItem.breakdown.push({ date: record.date, batch: record.batchNo, qty: record.duplesPkt });
                 }
             }
-            // Handle Vacuum Foil logic
             if (packetId === 'PD1006') {
                  const foilItem = calculatedData.find(i => i.id === 'VP1002');
                  if (foilItem) {
@@ -182,7 +176,6 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
             }
         }
         
-        // Carton Deductions
         if (cartonId) {
             const ctnItem = calculatedData.find(i => i.id === cartonId);
             if (ctnItem) {
@@ -250,7 +243,6 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
 
   return (
     <div className="space-y-6">
-      {/* Search Header Area */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-3 w-full md:w-auto">
           <div className="bg-amber-100 p-3 rounded-lg text-amber-700">
@@ -296,15 +288,11 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
         </div>
       </div>
 
-      {/* Styled Excel Table Container */}
       <div className="bg-white shadow-lg border border-gray-300 overflow-hidden">
-        
-        {/* Title Bar */}
         <div className="bg-[#4472c4] text-white text-center py-2 font-bold text-lg border-b border-gray-400 uppercase tracking-wider">
           Packing Material Daily Stock Report
         </div>
         
-        {/* Date Selector Row */}
         <div className="bg-white border-b border-black flex justify-between items-center px-4 py-2">
           <div className="flex items-center gap-2">
              <button onClick={() => adjustDate(-1)} className="p-1 hover:bg-gray-100 rounded text-gray-500 transition-colors">
@@ -357,7 +345,6 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
                       {row.dynamicOpening.toLocaleString()}
                     </td>
                     
-                    {/* Daily Inward */}
                     <td 
                       onMouseEnter={(e) => {
                         if (row.inward <= 0) return;
@@ -370,7 +357,6 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
                       {row.inward > 0 ? `+${row.inward.toLocaleString()}` : '-'}
                     </td>
                     
-                    {/* Daily Issues */}
                     <td 
                       onMouseEnter={(e) => {
                         if (row.issued <= 0) return;
@@ -383,12 +369,10 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
                       {row.issued > 0 ? `-${row.issued.toLocaleString()}` : '-'}
                     </td>
                     
-                    {/* Closing Available */}
                     <td className={`border border-black px-3 py-1 text-right font-bold bg-[#e2efda] text-lg ${row.available <= 500 ? 'text-red-700' : 'text-black'}`}>
                        {row.available.toLocaleString()}
                     </td>
 
-                    {/* Quick Add Action */}
                     <td className="border border-black px-3 py-1 text-center bg-[#e2efda]">
                       <button 
                         onClick={() => { setInwardModalItem(row); setInwardDate(selectedDate); }}
@@ -401,7 +385,6 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
                  </tr>
                ))}
                
-               {/* Total Row */}
                <tr className="bg-yellow-100 font-bold border-t-2 border-black text-black">
                   <td className="border border-black px-3 py-2 text-right" colSpan={2}>Grand Daily Activity:</td>
                   <td className="border border-black px-3 py-2 text-right">{filteredStock.reduce((acc, curr) => acc + curr.dynamicOpening, 0).toLocaleString()}</td>
@@ -415,7 +398,6 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
         </div>
       </div>
 
-      {/* Floating Log Breakdown */}
       {hoveredBreakdown && (
         <div 
           className="fixed z-50 bg-white shadow-2xl border border-black rounded-sm p-0 w-80 text-xs pointer-events-none overflow-hidden animate-fadeIn"
@@ -454,7 +436,6 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
         </div>
       )}
 
-      {/* History / Delete Modal */}
       {showHistoryModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[80vh] border border-black">
@@ -502,27 +483,13 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
                        </tr>
                      );
                    })}
-                   {transactions.length === 0 && (
-                     <tr>
-                       <td colSpan={4} className="px-6 py-20 text-center text-gray-400 font-bold uppercase tracking-widest italic opacity-40">
-                         No manual inward transactions found.
-                       </td>
-                     </tr>
-                   )}
                  </tbody>
                </table>
-            </div>
-            <div className="p-4 border-t border-black bg-gray-100 text-right flex justify-between items-center">
-               <span className="text-[10px] font-bold text-gray-400 uppercase italic">Admin Controlled Log</span>
-               <button onClick={() => setShowHistoryModal(false)} className="px-6 py-2 bg-white border border-black rounded font-bold text-black hover:bg-gray-50 shadow-md">
-                 CLOSE LOG
-               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Inward Modal */}
       {inwardModalItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="bg-white rounded shadow-2xl w-full max-w-sm overflow-hidden animate-fadeIn border-2 border-black">
