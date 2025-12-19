@@ -20,7 +20,9 @@ import {
   AlertCircle,
   Package,
   PieChart,
-  ClipboardList
+  ClipboardList,
+  Menu,
+  X
 } from 'lucide-react';
 import { ViewState, ProductionRecord, UserRole, SalesOrder } from './types';
 import { getRecords, saveRecord, deleteRecord, getSalesOrders, saveSalesOrder, deleteSalesOrder, deleteSalesOrders } from './services/storageService';
@@ -45,6 +47,7 @@ function App() {
   const [userRole, setUserRole] = useState<UserRole>('admin');
   const [username, setUsername] = useState<string>('Admin'); 
   const [view, setView] = useState<ViewState>('dashboard');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   // Data States
   const [records, setRecords] = useState<ProductionRecord[]>([]);
@@ -144,6 +147,7 @@ function App() {
   const handleEdit = (record: ProductionRecord) => {
     setEditingRecord(record);
     setView('entry');
+    setIsMobileMenuOpen(false);
   };
 
   const handleDelete = (id: string) => {
@@ -166,6 +170,7 @@ function App() {
   const handleEditOrder = (order: SalesOrder | null) => {
     setEditingOrder(order);
     setView('sales_entry');
+    setIsMobileMenuOpen(false);
   };
   
   // Refresh orders from local storage or trigger sync if needed
@@ -190,6 +195,7 @@ function App() {
         setView(target);
         setEditingRecord(null);
         setEditingOrder(null);
+        setIsMobileMenuOpen(false);
       }}
       className={`flex items-center gap-3 px-4 py-3 rounded-lg w-full transition-all flex-shrink-0 ${
         view === target 
@@ -202,18 +208,21 @@ function App() {
     </button>
   );
 
-  const MobileNavIcon = ({ target, icon: Icon, label }: { target: ViewState, icon: React.ElementType, label: string }) => (
+  const MobileNavIcon = ({ target, icon: Icon, label, active = false }: { target?: ViewState, icon: React.ElementType, label: string, active?: boolean }) => (
     <button
       onClick={() => {
-        setView(target);
-        setEditingRecord(null);
-        setEditingOrder(null);
+        if (target) {
+            setView(target);
+            setEditingRecord(null);
+            setEditingOrder(null);
+            setIsMobileMenuOpen(false);
+        }
       }}
       className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${
-        view === target ? 'text-blue-600' : 'text-gray-400'
+        (target === view || active) ? 'text-blue-600' : 'text-gray-400'
       }`}
     >
-      <Icon size={view === target ? 24 : 22} strokeWidth={view === target ? 2.5 : 2} />
+      <Icon size={(target === view || active) ? 24 : 22} strokeWidth={(target === view || active) ? 2.5 : 2} />
       <span className="text-[10px] font-medium">{label}</span>
     </button>
   );
@@ -483,13 +492,10 @@ function App() {
       {/* Mobile Bottom Navigation Bar */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-30 h-16 px-2 flex justify-between items-center print:hidden safe-area-pb">
          
-         {(userRole === 'admin' || userRole === 'yadav') && (
+         {userRole === 'admin' && (
            <>
              <MobileNavIcon target="dashboard" icon={LayoutDashboard} label="Home" />
-             
-             {userRole === 'admin' && <MobileNavIcon target="analytics" icon={PieChart} label="Stats" />}
-             {userRole === 'yadav' && <MobileNavIcon target="ledger_sheet" icon={FileText} label="Report" />}
-             
+             <MobileNavIcon target="analytics" icon={PieChart} label="Stats" />
              <div className="relative -top-6">
                 <button 
                   onClick={() => { setView('entry'); setEditingRecord(null); }}
@@ -498,11 +504,37 @@ function App() {
                   <Plus size={32} />
                 </button>
              </div>
-    
-             {userRole === 'admin' && <MobileNavIcon target="finished_goods" icon={ClipboardList} label="Stock" />}
-             {userRole === 'yadav' && <MobileNavIcon target="batches" icon={Archive} label="Batches" />}
+             <MobileNavIcon target="finished_goods" icon={ClipboardList} label="Stock" />
+             <button 
+               onClick={() => setIsMobileMenuOpen(true)}
+               className="flex flex-col items-center justify-center w-full h-full space-y-1 text-gray-400"
+             >
+               <Menu size={22} />
+               <span className="text-[10px] font-medium">More</span>
+             </button>
+           </>
+         )}
 
-             {canAccess('history') && <MobileNavIcon target="history" icon={History} label="History" />}
+         {userRole === 'yadav' && (
+           <>
+             <MobileNavIcon target="dashboard" icon={LayoutDashboard} label="Home" />
+             <MobileNavIcon target="ledger_sheet" icon={FileText} label="Report" />
+             <div className="relative -top-6">
+                <button 
+                  onClick={() => { setView('entry'); setEditingRecord(null); }}
+                  className="bg-blue-600 text-white w-14 h-14 rounded-full shadow-lg shadow-blue-600/40 flex items-center justify-center transform active:scale-95 transition-transform"
+                >
+                  <Plus size={32} />
+                </button>
+             </div>
+             <MobileNavIcon target="batches" icon={Archive} label="Batches" />
+             <button 
+               onClick={() => setIsMobileMenuOpen(true)}
+               className="flex flex-col items-center justify-center w-full h-full space-y-1 text-gray-400"
+             >
+               <Menu size={22} />
+               <span className="text-[10px] font-medium">More</span>
+             </button>
            </>
          )}
 
@@ -518,11 +550,114 @@ function App() {
                   <Plus size={32} />
                 </button>
              </div>
-             {/* Add Stock View for Sales */}
              <MobileNavIcon target="finished_goods" icon={ClipboardList} label="Stock" />
+             <button 
+               onClick={() => setIsMobileMenuOpen(true)}
+               className="flex flex-col items-center justify-center w-full h-full space-y-1 text-gray-400"
+             >
+               <Menu size={22} />
+               <span className="text-[10px] font-medium">More</span>
+             </button>
            </>
          )}
       </nav>
+
+      {/* Full-screen Mobile Menu Overlay */}
+      {isMobileMenuOpen && (
+        <div className="md:hidden fixed inset-0 z-[100] bg-white animate-fadeIn flex flex-col">
+          <div className="p-6 flex justify-between items-center border-b border-gray-100">
+            <div>
+               <h2 className="text-2xl font-bold text-gray-800">App Menu</h2>
+               <p className="text-sm text-gray-500">Access all factory sections</p>
+            </div>
+            <button 
+               onClick={() => setIsMobileMenuOpen(false)}
+               className="p-2 bg-gray-100 rounded-full text-gray-600"
+            >
+              <X size={24} />
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-6">
+            <div className="grid grid-cols-2 gap-4">
+               {/* Core Items (Filtered by access) */}
+               {canAccess('dashboard') && (
+                 <button onClick={() => { setView('dashboard'); setIsMobileMenuOpen(false); }} className="flex flex-col items-center p-4 bg-blue-50 rounded-2xl text-blue-700">
+                    <LayoutDashboard size={32} className="mb-2" />
+                    <span className="text-sm font-bold">Home</span>
+                 </button>
+               )}
+               {canAccess('analytics') && (
+                 <button onClick={() => { setView('analytics'); setIsMobileMenuOpen(false); }} className="flex flex-col items-center p-4 bg-purple-50 rounded-2xl text-purple-700">
+                    <PieChart size={32} className="mb-2" />
+                    <span className="text-sm font-bold">Analytics</span>
+                 </button>
+               )}
+               {canAccess('ledger_sheet') && (
+                 <button onClick={() => { setView('ledger_sheet'); setIsMobileMenuOpen(false); }} className="flex flex-col items-center p-4 bg-indigo-50 rounded-2xl text-indigo-700">
+                    <FileText size={32} className="mb-2" />
+                    <span className="text-sm font-bold">Ledger Report</span>
+                 </button>
+               )}
+               {canAccess('finished_goods') && (
+                 <button onClick={() => { setView('finished_goods'); setIsMobileMenuOpen(false); }} className="flex flex-col items-center p-4 bg-emerald-50 rounded-2xl text-emerald-700">
+                    <ClipboardList size={32} className="mb-2" />
+                    <span className="text-sm font-bold">FG Stock</span>
+                 </button>
+               )}
+               {canAccess('packing_stock') && (
+                 <button onClick={() => { setView('packing_stock'); setIsMobileMenuOpen(false); }} className="flex flex-col items-center p-4 bg-amber-50 rounded-2xl text-amber-700">
+                    <Package size={32} className="mb-2" />
+                    <span className="text-sm font-bold">Packing Mat.</span>
+                 </button>
+               )}
+               {canAccess('batches') && (
+                 <button onClick={() => { setView('batches'); setIsMobileMenuOpen(false); }} className="flex flex-col items-center p-4 bg-slate-50 rounded-2xl text-slate-700">
+                    <Archive size={32} className="mb-2" />
+                    <span className="text-sm font-bold">Batch Registry</span>
+                 </button>
+               )}
+               {canAccess('dispatch') && (
+                 <button onClick={() => { setView('dispatch'); setIsMobileMenuOpen(false); }} className="flex flex-col items-center p-4 bg-orange-50 rounded-2xl text-orange-700">
+                    <Truck size={32} className="mb-2" />
+                    <span className="text-sm font-bold">Dispatch Helper</span>
+                 </button>
+               )}
+               {canAccess('history') && (
+                 <button onClick={() => { setView('history'); setIsMobileMenuOpen(false); }} className="flex flex-col items-center p-4 bg-gray-50 rounded-2xl text-gray-700">
+                    <History size={32} className="mb-2" />
+                    <span className="text-sm font-bold">Entry History</span>
+                 </button>
+               )}
+               {canAccess('customers') && (
+                 <button onClick={() => { setView('customers'); setIsMobileMenuOpen(false); }} className="flex flex-col items-center p-4 bg-blue-50 rounded-2xl text-blue-700">
+                    <Users size={32} className="mb-2" />
+                    <span className="text-sm font-bold">Clients</span>
+                 </button>
+               )}
+               {canAccess('settings') && (
+                 <button onClick={() => { setView('settings'); setIsMobileMenuOpen(false); }} className="flex flex-col items-center p-4 bg-gray-100 rounded-2xl text-gray-700">
+                    <SettingsIcon size={32} className="mb-2" />
+                    <span className="text-sm font-bold">Settings</span>
+                 </button>
+               )}
+            </div>
+          </div>
+
+          <div className="p-6 border-t border-gray-100 bg-gray-50 space-y-3">
+             <div className="flex justify-between items-center text-xs font-bold text-gray-400 uppercase mb-2">
+                <span>User: {username}</span>
+                <SyncIndicator />
+             </div>
+             <button 
+                onClick={handleLogout}
+                className="w-full py-4 bg-red-50 text-red-600 rounded-xl font-bold flex items-center justify-center gap-2"
+             >
+                <LogOut size={20} /> Logout
+             </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
