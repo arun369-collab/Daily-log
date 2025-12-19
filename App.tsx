@@ -368,7 +368,7 @@ function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 p-4 md:p-8 overflow-x-hidden pb-24 md:pb-8 print:p-0 print:overflow-visible">
-        <header className="mb-6 md:mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4 print:mb-4">
+        <header className="mb-6 md:mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden">
           <div>
             <h1 className="text-xl md:text-2xl font-bold text-gray-800">
               {view === 'dashboard' && 'Daily Summary'}
@@ -386,8 +386,8 @@ function App() {
               {view === 'customers' && 'Customer Database'}
               {view === 'customer_behaviour' && 'Customer Intelligence'}
             </h1>
-            <p className="text-gray-500 text-sm mt-1 print:hidden hidden md:block">
-              {view !== 'ledger_sheet' && `Welcome, ${username}.`}
+            <p className="text-gray-500 text-sm mt-1">
+              Welcome, <span className="capitalize font-semibold">{username}</span>.
             </p>
           </div>
           

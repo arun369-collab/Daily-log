@@ -72,7 +72,7 @@ export const LedgerSheet: React.FC<LedgerSheetProps> = ({ records }) => {
       filtered = records.filter(r => r.date >= customStart && r.date <= customEnd);
     }
 
-    // Updated sorting to Ascending (oldest first) as requested
+    // Updated sorting to Ascending (oldest first / dec 1st on top)
     return [...filtered].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [records, reportType, selectedDate, selectedMonth, selectedWeek, customStart, customEnd]);
 
@@ -258,84 +258,70 @@ export const LedgerSheet: React.FC<LedgerSheetProps> = ({ records }) => {
       {/* Report Container - Styles adapt for Preview Mode */}
       <div className={`transition-all duration-300 ${isPreview ? 'p-8 bg-white shadow-2xl border border-gray-200 max-w-5xl mx-auto min-h-[1123px]' : ''}`}>
         
-        {/* Report Title - Visible on Print OR in Preview Mode */}
-        <div className={`hidden print:block text-center mb-4 border-b-2 border-black pb-2 ${isPreview ? '!block' : ''}`}>
-          <h1 className="text-2xl font-bold text-black uppercase tracking-wider">{reportTitle}</h1>
+        {/* Report Title - Centered Bold Header */}
+        <div className={`hidden print:block text-center mb-8 pb-4 border-b-2 border-black ${isPreview ? '!block' : ''}`}>
+          <h1 className="text-3xl font-black text-black uppercase tracking-[0.1em]">{reportTitle}</h1>
         </div>
 
         {/* Table Container */}
-        <div className={`bg-white shadow-lg overflow-hidden border border-gray-300 print:shadow-none print:border-none print:overflow-visible ${isPreview ? 'shadow-none border-none' : ''}`}>
+        <div className={`bg-white shadow-lg overflow-hidden border border-black print:shadow-none print:border-none print:overflow-visible ${isPreview ? 'shadow-none border-none' : ''}`}>
           <div className="overflow-x-auto print:overflow-visible">
-            <table className="w-full text-sm text-left border-collapse print:table-fixed print:text-xs">
+            <table className="w-full text-sm text-left border-collapse print:table-fixed print:text-[9pt]">
               <thead>
-                <tr className="bg-gray-100 text-gray-800 border-b-2 border-gray-400 font-bold uppercase text-xs tracking-wider print:bg-white print:border-black print:text-[10px]">
-                  <th className="px-3 py-4 border-r border-gray-300 w-24 print:border-black print:py-1 print:px-1">Date</th>
-                  <th className="px-3 py-4 border-r border-gray-300 print:border-black print:py-1 print:px-1">Product Name</th>
-                  <th className="px-3 py-4 border-r border-gray-300 w-24 print:border-black print:py-1 print:px-1">Batch No</th>
-                  <th className="px-3 py-4 border-r border-gray-300 w-24 print:border-black print:py-1 print:px-1">Size</th>
-                  <th className="px-3 py-4 border-r border-gray-300 text-right w-24 bg-blue-50 print:bg-white print:border-black print:py-1 print:px-1">Weight<br/><span className="text-[10px] print:text-[8px]">K.G.S</span></th>
-                  <th className="px-3 py-4 border-r border-gray-300 text-right w-24 text-red-700 bg-red-50 print:bg-white print:text-black print:border-black print:py-1 print:px-1">Rej-Weight<br/><span className="text-[10px] print:text-[8px]">K.G.S</span></th>
-                  <th className="px-3 py-4 border-r border-gray-300 text-right w-20 print:border-black print:py-1 print:px-1">Duplex<br/><span className="text-[10px] print:text-[8px]">(PCS/PKT)</span></th>
-                  <th className="px-3 py-4 text-right w-20 print:border-black print:py-1 print:px-1">Cartoon<br/><span className="text-[10px] print:text-[8px]">(CTN)</span></th>
+                <tr className="bg-gray-100 text-black border-b-2 border-black font-bold uppercase text-[10px] tracking-wider print:bg-white print:border-black">
+                  <th className="px-2 py-4 border-r border-black w-24 text-left print:py-2">Date</th>
+                  <th className="px-2 py-4 border-r border-black text-left print:py-2">Product Name</th>
+                  <th className="px-2 py-4 border-r border-black w-24 text-center print:py-2">Batch No</th>
+                  <th className="px-2 py-4 border-r border-black w-24 text-left print:py-2">Size</th>
+                  <th className="px-2 py-4 border-r border-black text-right w-24 print:py-2">Weight<br/><span className="text-[8px]">K.G.S</span></th>
+                  <th className="px-2 py-4 border-r border-black text-right w-24 print:py-2">Rej-Weight<br/><span className="text-[8px]">K.G.S</span></th>
+                  <th className="px-2 py-4 border-r border-black text-right w-24 print:py-2">Duplex<br/><span className="text-[8px]">(PCS/PKT)</span></th>
+                  <th className="px-2 py-4 text-right w-24 print:py-2">Cartoon<br/><span className="text-[8px]">(CTN)</span></th>
                 </tr>
               </thead>
-              <tbody className="text-gray-900 font-medium print:text-[10px]">
+              <tbody className="text-black font-semibold">
                 {filteredRecords.map((r, index) => (
                   <tr 
                     key={r.id} 
-                    className={`border-b border-gray-300 hover:bg-yellow-50 transition-colors print:border-black print:break-inside-avoid print:h-8 ${index % 2 === 0 ? 'bg-white' : 'bg-[#fafafa]'}`}
+                    className={`border-b border-black print:break-inside-avoid print:h-8 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
                   >
-                    <td className="px-3 py-3 border-r border-gray-300 whitespace-nowrap print:border-black print:py-1 print:px-1">{r.date}</td>
-                    <td className="px-3 py-3 border-r border-gray-300 print:border-black print:py-1 print:px-1">
+                    <td className="px-2 py-2 border-r border-black text-left whitespace-nowrap">{r.date}</td>
+                    <td className="px-2 py-2 border-r border-black text-left">
                       <span className="block truncate">
                         {r.productName}
-                        {r.isReturn && <span className="ml-1 text-[10px] font-bold text-orange-600 uppercase border border-orange-200 px-1 rounded bg-orange-50">(Return)</span>}
+                        {r.isReturn && <span className="ml-1 text-[8px] font-bold text-red-600 uppercase border border-red-200 px-1 rounded bg-red-50">(Returned)</span>}
                       </span>
                     </td>
-                    <td className="px-3 py-3 border-r border-gray-300 font-mono text-xs print:border-black print:py-1 print:px-1 print:text-[10px]">{r.batchNo}</td>
-                    <td className="px-3 py-3 border-r border-gray-300 whitespace-nowrap print:border-black print:py-1 print:px-1">{r.size}</td>
-                    <td className="px-3 py-3 border-r border-gray-300 text-right font-bold text-blue-700 bg-blue-50/30 print:bg-white print:text-black print:border-black print:py-1 print:px-1">
+                    <td className="px-2 py-2 border-r border-black text-center font-mono text-[9pt]">{r.batchNo}</td>
+                    <td className="px-2 py-2 border-r border-black text-left whitespace-nowrap">{r.size}</td>
+                    <td className="px-2 py-2 border-r border-black text-right font-bold">
                       {r.weightKg.toFixed(2)}
                     </td>
-                    <td className="px-3 py-3 border-r border-gray-300 text-right text-red-600 bg-red-50/30 print:bg-white print:text-black print:border-black print:py-1 print:px-1">
+                    <td className="px-2 py-2 border-r border-black text-right">
                       {r.rejectedKg > 0 ? r.rejectedKg.toFixed(2) : '-'}
                     </td>
-                    <td className="px-3 py-3 border-r border-gray-300 text-right print:border-black print:py-1 print:px-1">{r.duplesPkt}</td>
-                    <td className="px-3 py-3 text-right font-bold print:border-black print:py-1 print:px-1">{r.cartonCtn}</td>
-                  </tr>
-                ))}
-                
-                {/* Add empty rows only in Preview, hide in Print to save space */}
-                {filteredRecords.length < 5 && isPreview && Array.from({ length: 5 - filteredRecords.length }).map((_, i) => (
-                  <tr key={`empty-${i}`} className="border-b border-gray-200 h-12">
-                    <td className="border-r border-gray-200"></td>
-                    <td className="border-r border-gray-200"></td>
-                    <td className="border-r border-gray-200"></td>
-                    <td className="border-r border-gray-200"></td>
-                    <td className="border-r border-gray-200 bg-blue-50/10"></td>
-                    <td className="border-r border-gray-200 bg-red-50/10"></td>
-                    <td className="border-r border-gray-200"></td>
-                    <td></td>
+                    <td className="px-2 py-2 border-r border-black text-right">{r.duplesPkt}</td>
+                    <td className="px-2 py-2 text-right font-bold">{r.cartonCtn}</td>
                   </tr>
                 ))}
               </tbody>
               
-              {/* Totals Footer - Visible on Print OR in Preview Mode */}
+              {/* Totals Footer */}
               {filteredRecords.length > 0 && (
-                <tfoot className={`hidden print:table-footer-group bg-gray-100 border-t-2 border-black font-bold print:text-[10px] ${isPreview ? '!table-footer-group' : ''}`}>
+                <tfoot className={`hidden print:table-footer-group bg-gray-100 border-t-2 border-black font-bold print:bg-white ${isPreview ? '!table-footer-group' : ''}`}>
                    <tr>
-                      <td colSpan={4} className="px-3 py-3 text-right border-r border-black print:py-1 print:px-1">TOTALS:</td>
-                      <td className="px-3 py-3 text-right border-r border-black print:py-1 print:px-1">
+                      <td colSpan={4} className="px-2 py-3 text-right border-r border-black">GRAND TOTALS:</td>
+                      <td className="px-2 py-3 text-right border-r border-black">
                         {filteredRecords.reduce((sum, r) => sum + r.weightKg, 0).toFixed(2)}
                       </td>
-                      <td className="px-3 py-3 text-right border-r border-black print:py-1 print:px-1">
+                      <td className="px-2 py-3 text-right border-r border-black">
                         {filteredRecords.reduce((sum, r) => sum + r.rejectedKg, 0).toFixed(2)}
                       </td>
-                      <td className="px-3 py-3 text-right border-r border-black print:py-1 print:px-1">
-                         {filteredRecords.reduce((sum, r) => sum + r.duplesPkt, 0)}
+                      <td className="px-2 py-3 text-right border-r border-black">
+                         {filteredRecords.reduce((sum, r) => sum + r.duplesPkt, 0).toLocaleString()}
                       </td>
-                      <td className="px-3 py-3 text-right print:py-1 print:px-1">
-                         {filteredRecords.reduce((sum, r) => sum + r.cartonCtn, 0)}
+                      <td className="px-2 py-3 text-right">
+                         {filteredRecords.reduce((sum, r) => sum + r.cartonCtn, 0).toLocaleString()}
                       </td>
                    </tr>
                 </tfoot>
