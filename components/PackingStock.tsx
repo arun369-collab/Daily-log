@@ -141,7 +141,9 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
     });
 
     records.forEach(record => {
-        if (record.date < STOCK_CALCULATION_START_DATE || record.isReturn) return;
+        // SKIP: Return entries AND Dispatch entries (Dispatch does not consume new packing mat)
+        if (record.date < STOCK_CALCULATION_START_DATE || record.isReturn || record.isDispatch) return;
+        
         const { packetId, cartonId } = resolveMaterialIds(record);
 
         if (packetId) {

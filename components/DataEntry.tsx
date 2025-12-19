@@ -88,7 +88,7 @@ export const DataEntry: React.FC<DataEntryProps> = ({ onSave, onCancel, initialD
 
   // Tentative Calculations (Analysis only, does not set state)
   const suggestions = useMemo(() => {
-    if (!weightKg || !ctnWeight || !pktWeight) return null;
+    if (!weightKg || !ctnWeight || !pktWeight || entryType === 'dispatch') return null;
     
     // Calculate theoretical counts based on weight
     const rawCtn = Number(weightKg) / ctnWeight;
@@ -102,7 +102,7 @@ export const DataEntry: React.FC<DataEntryProps> = ({ onSave, onCancel, initialD
       fullCtn: Math.floor(rawCtn),
       remainderPkts: Math.round((Number(weightKg) % ctnWeight) / pktWeight)
     };
-  }, [weightKg, ctnWeight, pktWeight]);
+  }, [weightKg, ctnWeight, pktWeight, entryType]);
 
   // Form Validation Logic
   const isFormValid = useMemo(() => {
@@ -111,11 +111,10 @@ export const DataEntry: React.FC<DataEntryProps> = ({ onSave, onCancel, initialD
       selectedType !== '' &&
       batchNo.trim() !== '' &&
       selectedSize !== '' &&
-      weightKg !== '' &&
-      cartonCtn !== '';
+      weightKg !== '';
       
     if (entryType === 'dispatch') return commonValid;
-    return commonValid && rejectedKg !== '' && duplesPkt !== '';
+    return commonValid && cartonCtn !== '' && rejectedKg !== '' && duplesPkt !== '';
   }, [date, selectedFamily, selectedType, batchNo, selectedSize, weightKg, rejectedKg, duplesPkt, cartonCtn, entryType]);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -131,7 +130,7 @@ export const DataEntry: React.FC<DataEntryProps> = ({ onSave, onCancel, initialD
       weightKg: Number(weightKg),
       rejectedKg: entryType === 'dispatch' ? 0 : Number(rejectedKg),
       duplesPkt: entryType === 'dispatch' ? 0 : Number(duplesPkt),
-      cartonCtn: Number(cartonCtn),
+      cartonCtn: entryType === 'dispatch' ? 0 : Number(cartonCtn),
       notes: notes,
       timestamp: initialData ? initialData.timestamp : Date.now(),
       isReturn: entryType === 'return',
@@ -343,55 +342,57 @@ export const DataEntry: React.FC<DataEntryProps> = ({ onSave, onCancel, initialD
               <div className="flex flex-col justify-end">
                   <div className="bg-red-50 text-red-600 p-2.5 rounded-lg border border-red-100 text-xs font-medium flex items-center gap-2">
                     <Truck size={16} /> 
-                    <span>This will deduct weight from Finished Goods stock.</span>
+                    <span>Deducts weight from Finished Goods. No material packing needed.</span>
                   </div>
               </div>
            )}
         </div>
 
-        {/* 7. Duples & 8. Carton */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-gray-50 p-4 rounded-xl border border-gray-200">
-           <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {entryType === 'dispatch' ? 'Total Packets (Optional)' : 'Duples (PKT)'}
-              </label>
-              <div className="relative">
-                <input
-                  type="number"
-                  min="0"
-                  value={duplesPkt}
-                  onChange={(e) => setDuplesPkt(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                  className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 outline-none ${entryType === 'dispatch' ? 'focus:ring-red-500' : entryType === 'return' ? 'focus:ring-orange-500' : 'focus:ring-blue-500'}`}
-                />
-              </div>
-              {suggestions && (
-                <div className="mt-1 flex items-center gap-1 text-xs text-amber-600 font-medium animate-pulse">
-                  <Info size={12} />
-                  <span>Est: {suggestions.pkt.toFixed(0)} PKT (Total)</span>
+        {/* 7. Duples & 8. Carton - Hidden for Dispatch */}
+        {entryType !== 'dispatch' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-gray-50 p-4 rounded-xl border border-gray-200">
+             <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {entryType === 'return' ? 'Good Duples (PKT)' : 'Duples (PKT)'}
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    value={duplesPkt}
+                    onChange={(e) => setDuplesPkt(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                    className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 outline-none ${entryType === 'return' ? 'focus:ring-orange-500' : 'focus:ring-blue-500'}`}
+                  />
                 </div>
-              )}
-           </div>
-           <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {entryType === 'dispatch' ? 'Total Cartons' : 'Carton (CTN)'}
-              </label>
-              <div className="relative">
-                <input
-                  type="number"
-                  min="0"
-                  value={cartonCtn}
-                  onChange={(e) => setCartonCtn(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                  className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 outline-none font-semibold ${entryType === 'dispatch' ? 'focus:ring-red-500' : entryType === 'return' ? 'focus:ring-orange-500' : 'focus:ring-blue-500'}`}
-                />
-              </div>
-               {suggestions && (
-                <div className="mt-1 flex items-center gap-1 text-xs text-amber-600 font-medium animate-pulse">
-                  <Info size={12} />
-                  <span>Est: {suggestions.ctn.toFixed(1)} CTN</span>
+                {suggestions && (
+                  <div className="mt-1 flex items-center gap-1 text-xs text-amber-600 font-medium animate-pulse">
+                    <Info size={12} />
+                    <span>Est: {suggestions.pkt.toFixed(0)} PKT (Total)</span>
+                  </div>
+                )}
+             </div>
+             <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {entryType === 'return' ? 'Good Carton (CTN)' : 'Carton (CTN)'}
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    value={cartonCtn}
+                    onChange={(e) => setCartonCtn(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                    className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 outline-none font-semibold ${entryType === 'return' ? 'focus:ring-orange-500' : 'focus:ring-blue-500'}`}
+                  />
                 </div>
-              )}
-           </div>
-        </div>
+                 {suggestions && (
+                  <div className="mt-1 flex items-center gap-1 text-xs text-amber-600 font-medium animate-pulse">
+                    <Info size={12} />
+                    <span>Est: {suggestions.ctn.toFixed(1)} CTN</span>
+                  </div>
+                )}
+             </div>
+          </div>
+        )}
 
         {/* Notes */}
         <div>
