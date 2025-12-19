@@ -96,6 +96,9 @@ export const LedgerSheet: React.FC<LedgerSheetProps> = ({ records }) => {
     return [...filtered].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [records, reportType, entryFilter, selectedDate, selectedMonth, selectedWeek, customStart, customEnd]);
 
+  // Logic to determine if Duplex/Cartoon columns should be visible
+  const showExtraCols = entryFilter === 'all' || entryFilter === 'production';
+
   // Dynamic Title for the Report
   const reportTitle = useMemo(() => {
     const typeLabel = entryFilter === 'production' ? 'Production' : 
@@ -340,8 +343,12 @@ export const LedgerSheet: React.FC<LedgerSheetProps> = ({ records }) => {
                   <th className="px-1.5 py-4 border-r border-black w-24 text-left print:py-2">Size</th>
                   <th className="px-1.5 py-4 border-r border-black text-right w-20 print:py-2">Weight<br/><span className="text-[7px]">K.G.S</span></th>
                   <th className="px-1.5 py-4 border-r border-black text-right w-20 print:py-2">Rej-Weight<br/><span className="text-[7px]">K.G.S</span></th>
-                  <th className="px-1.5 py-4 border-r border-black text-right w-20 print:py-2">Duplex<br/><span className="text-[7px]">(PCS/PKT)</span></th>
-                  <th className="px-1.5 py-4 text-right w-20 print:py-2">Cartoon<br/><span className="text-[7px]">(CTN)</span></th>
+                  {showExtraCols && (
+                    <>
+                      <th className="px-1.5 py-4 border-r border-black text-right w-20 print:py-2">Duplex<br/><span className="text-[7px]">(PCS/PKT)</span></th>
+                      <th className="px-1.5 py-4 text-right w-20 print:py-2">Cartoon<br/><span className="text-[7px]">(CTN)</span></th>
+                    </>
+                  )}
                 </tr>
               </thead>
               <tbody className="text-black font-semibold">
@@ -372,12 +379,16 @@ export const LedgerSheet: React.FC<LedgerSheetProps> = ({ records }) => {
                     <td className="px-1.5 py-2 border-r border-black text-right">
                       {r.rejectedKg > 0 ? r.rejectedKg.toFixed(2) : '-'}
                     </td>
-                    <td className="px-1.5 py-2 border-r border-black text-right">
-                       {(r.isReturn || r.isDispatch) ? '-' : (r.duplesPkt > 0 ? r.duplesPkt : '-')}
-                    </td>
-                    <td className="px-1.5 py-2 text-right font-bold">
-                       {(r.isReturn || r.isDispatch) ? '-' : (r.cartonCtn > 0 ? r.cartonCtn : '-')}
-                    </td>
+                    {showExtraCols && (
+                      <>
+                        <td className="px-1.5 py-2 border-r border-black text-right">
+                          {r.duplesPkt > 0 ? r.duplesPkt : '-'}
+                        </td>
+                        <td className="px-1.5 py-2 text-right font-bold">
+                          {r.cartonCtn > 0 ? r.cartonCtn : '-'}
+                        </td>
+                      </>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -392,12 +403,16 @@ export const LedgerSheet: React.FC<LedgerSheetProps> = ({ records }) => {
                       <td className="px-1.5 py-3 text-right border-r border-black print:text-[9pt]">
                         {filteredRecords.reduce((sum, r) => sum + r.rejectedKg, 0).toFixed(2)}
                       </td>
-                      <td className="px-1.5 py-3 text-right border-r border-black print:text-[9pt]">
-                         {(entryFilter === 'return' || entryFilter === 'dispatch') ? '-' : filteredRecords.reduce((sum, r) => sum + (r.isReturn || r.isDispatch ? 0 : r.duplesPkt), 0).toLocaleString()}
-                      </td>
-                      <td className="px-1.5 py-3 text-right font-black text-sm print:text-[9pt]">
-                         {(entryFilter === 'return' || entryFilter === 'dispatch') ? '-' : filteredRecords.reduce((sum, r) => sum + (r.isReturn || r.isDispatch ? 0 : r.cartonCtn), 0).toLocaleString()}
-                      </td>
+                      {showExtraCols && (
+                        <>
+                          <td className="px-1.5 py-3 text-right border-r border-black print:text-[9pt]">
+                            {filteredRecords.reduce((sum, r) => sum + (r.isReturn || r.isDispatch ? 0 : r.duplesPkt), 0).toLocaleString()}
+                          </td>
+                          <td className="px-1.5 py-3 text-right font-black text-sm print:text-[9pt]">
+                            {filteredRecords.reduce((sum, r) => sum + (r.isReturn || r.isDispatch ? 0 : r.cartonCtn), 0).toLocaleString()}
+                          </td>
+                        </>
+                      )}
                    </tr>
                 </tfoot>
               )}
