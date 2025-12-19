@@ -1,16 +1,18 @@
 
 import React, { useState, useMemo } from 'react';
 import { ProductionRecord } from '../types';
-import { FileText, Printer, Calendar, Filter, ArrowRight, Eye, X, Check } from 'lucide-react';
+import { FileText, Printer, Calendar, Filter, ArrowRight, Eye, X, Check, Factory, RotateCcw, Truck, List } from 'lucide-react';
 
 interface LedgerSheetProps {
   records: ProductionRecord[];
 }
 
 type ReportType = 'all' | 'daily' | 'weekly' | 'monthly' | 'custom';
+type EntryFilterType = 'all' | 'production' | 'return' | 'dispatch';
 
 export const LedgerSheet: React.FC<LedgerSheetProps> = ({ records }) => {
   const [reportType, setReportType] = useState<ReportType>('daily');
+  const [entryFilter, setEntryFilter] = useState<EntryFilterType>('all');
   const [isPreview, setIsPreview] = useState(false);
   
   // Date State defaults
@@ -64,42 +66,60 @@ export const LedgerSheet: React.FC<LedgerSheetProps> = ({ records }) => {
   const filteredRecords = useMemo(() => {
     let filtered = records;
 
+    // 1. Filter by Date Period
     if (reportType === 'daily') {
-      filtered = records.filter(r => r.date === selectedDate);
+      filtered = filtered.filter(r => r.date === selectedDate);
     } 
     else if (reportType === 'weekly') {
       if (selectedWeek) {
         const { start, end } = getWeekRange(selectedWeek);
-        filtered = records.filter(r => r.date >= start && r.date <= end);
+        filtered = filtered.filter(r => r.date >= start && r.date <= end);
       }
     }
     else if (reportType === 'monthly') {
-      filtered = records.filter(r => r.date.startsWith(selectedMonth));
+      filtered = filtered.filter(r => r.date.startsWith(selectedMonth));
     }
     else if (reportType === 'custom') {
-      filtered = records.filter(r => r.date >= customStart && r.date <= customEnd);
+      filtered = filtered.filter(r => r.date >= customStart && r.date <= customEnd);
+    }
+
+    // 2. Filter by Record Type
+    if (entryFilter === 'production') {
+      filtered = filtered.filter(r => !r.isReturn && !r.isDispatch);
+    } else if (entryFilter === 'return') {
+      filtered = filtered.filter(r => r.isReturn);
+    } else if (entryFilter === 'dispatch') {
+      filtered = filtered.filter(r => r.isDispatch);
     }
 
     // Ascending Sort (1st of the month at top)
     return [...filtered].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }, [records, reportType, selectedDate, selectedMonth, selectedWeek, customStart, customEnd]);
+  }, [records, reportType, entryFilter, selectedDate, selectedMonth, selectedWeek, customStart, customEnd]);
 
   // Dynamic Title for the Report
   const reportTitle = useMemo(() => {
+    const typeLabel = entryFilter === 'production' ? 'Production' : 
+                      entryFilter === 'return' ? 'Returns' : 
+                      entryFilter === 'dispatch' ? 'Dispatch' : 'Combined';
+    
+    let periodLabel = '';
     if (reportType === 'daily') {
-      return `Production Report of ${formatDisplayDate(selectedDate)}`;
+      periodLabel = `of ${formatDisplayDate(selectedDate)}`;
     } else if (reportType === 'monthly') {
       const [year, month] = selectedMonth.split('-');
       const monthName = new Date(parseInt(year), parseInt(month) - 1).toLocaleString('default', { month: 'long' });
-      return `Production Report of ${monthName} ${year}`;
+      periodLabel = `of ${monthName} ${year}`;
     } else if (reportType === 'weekly') {
        const { start, end } = getWeekRange(selectedWeek);
-       return `Production Report: ${formatDisplayDate(start)} to ${formatDisplayDate(end)}`;
+       periodLabel = `Report: ${formatDisplayDate(start)} to ${formatDisplayDate(end)}`;
     } else if (reportType === 'custom') {
-      return `Production Report: ${formatDisplayDate(customStart)} to ${formatDisplayDate(customEnd)}`;
+      periodLabel = `Report: ${formatDisplayDate(customStart)} to ${formatDisplayDate(customEnd)}`;
+    } else {
+      periodLabel = '(All Time)';
     }
-    return 'Production Ledger (All Time)';
-  }, [reportType, selectedDate, selectedMonth, selectedWeek, customStart, customEnd]);
+
+    return `${typeLabel} Ledger ${periodLabel}`;
+  }, [reportType, entryFilter, selectedDate, selectedMonth, selectedWeek, customStart, customEnd]);
 
   const handlePrint = () => {
     window.print();
@@ -115,8 +135,8 @@ export const LedgerSheet: React.FC<LedgerSheetProps> = ({ records }) => {
               <FileText size={24} />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-gray-800">Ledger Reports</h2>
-              <p className="text-sm text-gray-500">Generate and print production reports.</p>
+              <h2 className="text-xl font-bold text-gray-800">Daily Ledger Report</h2>
+              <p className="text-sm text-gray-500">Filter, review, and print floor activity reports.</p>
             </div>
           </div>
         )}
@@ -148,106 +168,157 @@ export const LedgerSheet: React.FC<LedgerSheetProps> = ({ records }) => {
         )}
 
         {!isPreview && (
-          <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col xl:flex-row gap-4 xl:items-end justify-between">
-            <div className="flex flex-col md:flex-row gap-4 w-full">
-              <div className="w-full md:w-48 flex-shrink-0">
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Report Period</label>
-                <div className="relative">
-                  <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                  <select
-                    value={reportType}
-                    onChange={(e) => setReportType(e.target.value as ReportType)}
-                    className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 appearance-none bg-white"
-                  >
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
-                    <option value="custom">Custom Date Range</option>
-                    <option value="all">Till Date (All)</option>
-                  </select>
+          <div className="space-y-4">
+            {/* Main Control Panel */}
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col xl:flex-row gap-4 xl:items-end justify-between">
+              <div className="flex flex-col md:flex-row gap-4 w-full">
+                
+                {/* 1. Period Selector */}
+                <div className="w-full md:w-48 flex-shrink-0">
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Time Period</label>
+                  <div className="relative">
+                    <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                    <select
+                      value={reportType}
+                      onChange={(e) => setReportType(e.target.value as ReportType)}
+                      className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 appearance-none bg-white"
+                    >
+                      <option value="daily">Daily</option>
+                      <option value="weekly">Weekly</option>
+                      <option value="monthly">Monthly</option>
+                      <option value="custom">Custom Range</option>
+                      <option value="all">Full History</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* 2. Date Pickers */}
+                <div className="flex-1 animate-fadeIn">
+                  {reportType === 'daily' && (
+                    <div className="w-full md:w-48">
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Select Date</label>
+                      <input
+                        type="date"
+                        value={selectedDate}
+                        onChange={(e) => setSelectedDate(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                  )}
+                  {reportType === 'weekly' && (
+                    <div className="w-full md:w-56">
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Select Week</label>
+                      <input
+                        type="week"
+                        value={selectedWeek}
+                        onChange={(e) => setSelectedWeek(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                  )}
+                  {reportType === 'monthly' && (
+                    <div className="w-full md:w-48">
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Select Month</label>
+                      <div className="relative">
+                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                        <input
+                          type="month"
+                          value={selectedMonth}
+                          onChange={(e) => setSelectedMonth(e.target.value)}
+                          className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                    </div>
+                  )}
+                  {reportType === 'custom' && (
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1">
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">From</label>
+                        <input
+                          type="date"
+                          value={customStart}
+                          onChange={(e) => setCustomStart(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                      <ArrowRight className="text-gray-400 mt-5" size={16} />
+                      <div className="flex-1">
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">To</label>
+                        <input
+                          type="date"
+                          value={customEnd}
+                          onChange={(e) => setCustomEnd(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              <div className="flex-1 animate-fadeIn">
-                {reportType === 'daily' && (
-                  <div className="w-full md:w-48">
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Select Date</label>
-                    <input
-                      type="date"
-                      value={selectedDate}
-                      onChange={(e) => setSelectedDate(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                  </div>
-                )}
-                {reportType === 'weekly' && (
-                  <div className="w-full md:w-56">
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Select Week</label>
-                    <input
-                      type="week"
-                      value={selectedWeek}
-                      onChange={(e) => setSelectedWeek(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                  </div>
-                )}
-                {reportType === 'monthly' && (
-                  <div className="w-full md:w-48">
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Select Month</label>
-                    <div className="relative">
-                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                      <input
-                        type="month"
-                        value={selectedMonth}
-                        onChange={(e) => setSelectedMonth(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
-                      />
-                    </div>
-                  </div>
-                )}
-                {reportType === 'custom' && (
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1">
-                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">From</label>
-                      <input
-                        type="date"
-                        value={customStart}
-                        onChange={(e) => setCustomStart(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
-                      />
-                    </div>
-                    <ArrowRight className="text-gray-400 mt-5" size={16} />
-                    <div className="flex-1">
-                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">To</label>
-                      <input
-                        type="date"
-                        value={customEnd}
-                        onChange={(e) => setCustomEnd(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
-                      />
-                    </div>
-                  </div>
-                )}
+              {/* Action Buttons */}
+              <div className="flex gap-2 w-full xl:w-auto mt-4 xl:mt-0">
+                <button
+                  type="button"
+                  onClick={() => setIsPreview(true)}
+                  className="flex-1 xl:flex-none flex items-center justify-center gap-2 px-6 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all shadow-sm active:scale-95"
+                >
+                  <Eye size={18} />
+                  <span>Preview</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePrint}
+                  className="flex-1 xl:flex-none flex items-center justify-center gap-2 px-6 py-2.5 bg-gray-800 text-white rounded-lg hover:bg-black transition-all shadow-md active:scale-95"
+                >
+                  <Printer size={18} />
+                  <span>Print</span>
+                </button>
               </div>
             </div>
 
-            <div className="flex gap-2 w-full xl:w-auto mt-4 xl:mt-0">
-               <button
-                type="button"
-                onClick={() => setIsPreview(true)}
-                className="flex-1 xl:flex-none flex items-center justify-center gap-2 px-6 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all shadow-sm active:scale-95"
-              >
-                <Eye size={18} />
-                <span>Preview</span>
-              </button>
-              <button
-                type="button"
-                onClick={handlePrint}
-                className="flex-1 xl:flex-none flex items-center justify-center gap-2 px-6 py-2.5 bg-gray-800 text-white rounded-lg hover:bg-black transition-all shadow-md active:scale-95"
-              >
-                <Printer size={18} />
-                <span>Print</span>
-              </button>
+            {/* Entry Type Filter Tabs */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+               <button 
+                  onClick={() => setEntryFilter('all')}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all whitespace-nowrap border ${
+                    entryFilter === 'all' 
+                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-200' 
+                    : 'bg-white text-gray-500 border-gray-200 hover:border-indigo-300'
+                  }`}
+               >
+                 <List size={14} /> All Activity
+               </button>
+               <button 
+                  onClick={() => setEntryFilter('production')}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all whitespace-nowrap border ${
+                    entryFilter === 'production' 
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-200' 
+                    : 'bg-white text-gray-500 border-gray-200 hover:border-blue-300'
+                  }`}
+               >
+                 <Factory size={14} /> Production
+               </button>
+               <button 
+                  onClick={() => setEntryFilter('return')}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all whitespace-nowrap border ${
+                    entryFilter === 'return' 
+                    ? 'bg-orange-600 text-white border-orange-600 shadow-md shadow-orange-200' 
+                    : 'bg-white text-gray-500 border-gray-200 hover:border-orange-300'
+                  }`}
+               >
+                 <RotateCcw size={14} /> Returns
+               </button>
+               <button 
+                  onClick={() => setEntryFilter('dispatch')}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all whitespace-nowrap border ${
+                    entryFilter === 'dispatch' 
+                    ? 'bg-red-600 text-white border-red-600 shadow-md shadow-red-200' 
+                    : 'bg-white text-gray-500 border-gray-200 hover:border-red-300'
+                  }`}
+               >
+                 <Truck size={14} /> Despatch
+               </button>
             </div>
           </div>
         )}
@@ -281,10 +352,17 @@ export const LedgerSheet: React.FC<LedgerSheetProps> = ({ records }) => {
                   >
                     <td className="px-1.5 py-2 border-r border-black text-left whitespace-nowrap">{formatDisplayDate(r.date)}</td>
                     <td className="px-1.5 py-2 border-r border-black text-left">
-                      <span className="block leading-tight">
-                        {r.productName}
-                        {r.isReturn && <span className="ml-1 text-[7px] font-bold text-red-600 uppercase border border-red-200 px-1 rounded bg-red-50">(Ret)</span>}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="block leading-tight">
+                          {r.productName}
+                        </span>
+                        {r.isReturn && (
+                           <span className="px-1 text-[7px] font-black bg-orange-600 text-white rounded uppercase whitespace-nowrap">Return</span>
+                        )}
+                        {r.isDispatch && (
+                           <span className="px-1 text-[7px] font-black bg-red-600 text-white rounded uppercase whitespace-nowrap">Desp</span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-1.5 py-2 border-r border-black text-center font-mono text-[8pt]">{r.batchNo}</td>
                     <td className="px-1.5 py-2 border-r border-black text-left whitespace-nowrap">{r.size}</td>
@@ -294,8 +372,12 @@ export const LedgerSheet: React.FC<LedgerSheetProps> = ({ records }) => {
                     <td className="px-1.5 py-2 border-r border-black text-right">
                       {r.rejectedKg > 0 ? r.rejectedKg.toFixed(2) : '-'}
                     </td>
-                    <td className="px-1.5 py-2 border-r border-black text-right">{r.duplesPkt}</td>
-                    <td className="px-1.5 py-2 text-right font-bold">{r.cartonCtn}</td>
+                    <td className="px-1.5 py-2 border-r border-black text-right">
+                       {r.duplesPkt > 0 ? r.duplesPkt : '-'}
+                    </td>
+                    <td className="px-1.5 py-2 text-right font-bold">
+                       {r.cartonCtn > 0 ? r.cartonCtn : '-'}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -326,7 +408,7 @@ export const LedgerSheet: React.FC<LedgerSheetProps> = ({ records }) => {
       
       {filteredRecords.length === 0 && (
         <div className="text-center py-12 text-gray-400">
-          <p>No records found for the selected period.</p>
+          <p>No records found matching your current filter selection.</p>
         </div>
       )}
     </div>
