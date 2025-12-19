@@ -377,7 +377,7 @@ function App() {
               {view === 'packing_stock' && 'Packing Material Stock'}
               {view === 'finished_goods' && 'Finished Goods Inventory'}
               {view === 'batches' && 'Batch Registry'}
-              {view === 'ledger_sheet' && 'Daily Ledger Report'}
+              {view === 'ledger_sheet' && ''}
               {view === 'dispatch' && 'Dispatch Priority (FIFO)'}
               {view === 'history' && 'Ledger History'}
               {view === 'settings' && 'App Configuration'}
@@ -387,7 +387,7 @@ function App() {
               {view === 'customer_behaviour' && 'Customer Intelligence'}
             </h1>
             <p className="text-gray-500 text-sm mt-1 print:hidden hidden md:block">
-              Welcome, <span className="capitalize font-semibold">{username}</span>.
+              {view !== 'ledger_sheet' && `Welcome, ${username}.`}
             </p>
           </div>
           

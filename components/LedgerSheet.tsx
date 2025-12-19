@@ -1,5 +1,4 @@
 
-// ... imports remain the same
 import React, { useState, useMemo } from 'react';
 import { ProductionRecord } from '../types';
 import { FileText, Printer, Calendar, Filter, ArrowRight, Eye, X, Check } from 'lucide-react';
@@ -80,16 +79,16 @@ export const LedgerSheet: React.FC<LedgerSheetProps> = ({ records }) => {
   // Dynamic Title for the Report
   const reportTitle = useMemo(() => {
     if (reportType === 'daily') {
-      return `Daily Report: ${selectedDate}`;
+      return `Production Report of ${selectedDate}`;
     } else if (reportType === 'monthly') {
       const [year, month] = selectedMonth.split('-');
       const monthName = new Date(parseInt(year), parseInt(month) - 1).toLocaleString('default', { month: 'long' });
-      return `Monthly Report: ${monthName} ${year}`;
+      return `Production Report of ${monthName} ${year}`;
     } else if (reportType === 'weekly') {
        const { start, end } = getWeekRange(selectedWeek);
-       return `Weekly Report: ${start} to ${end}`;
+       return `Production Report: ${start} to ${end}`;
     } else if (reportType === 'custom') {
-      return `Custom Report: ${customStart} to ${customEnd}`;
+      return `Production Report: ${customStart} to ${customEnd}`;
     }
     return 'Production Ledger (All Time)';
   }, [reportType, selectedDate, selectedMonth, selectedWeek, customStart, customEnd]);
@@ -135,7 +134,7 @@ export const LedgerSheet: React.FC<LedgerSheetProps> = ({ records }) => {
               </button>
               <button 
                 onClick={handlePrint}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-bold flex items-center gap-2 shadow-lg shadow-blue-900/50 transition-colors"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-50 rounded-lg text-sm font-bold flex items-center gap-2 shadow-lg shadow-blue-900/50 transition-colors"
               >
                 <Printer size={16} /> Print Now
               </button>
@@ -262,7 +261,6 @@ export const LedgerSheet: React.FC<LedgerSheetProps> = ({ records }) => {
         {/* Report Title - Visible on Print OR in Preview Mode */}
         <div className={`hidden print:block text-center mb-4 border-b-2 border-black pb-2 ${isPreview ? '!block' : ''}`}>
           <h1 className="text-2xl font-bold text-black uppercase tracking-wider">{reportTitle}</h1>
-          <p className="text-xs text-gray-600 mt-1">Generated via FactoryFlow Coordinator</p>
         </div>
 
         {/* Table Container */}
