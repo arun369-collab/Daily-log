@@ -88,7 +88,7 @@ export const DataEntry: React.FC<DataEntryProps> = ({ onSave, onCancel, initialD
 
   // Tentative Calculations (Analysis only, does not set state)
   const suggestions = useMemo(() => {
-    if (!weightKg || !ctnWeight || !pktWeight || entryType === 'dispatch') return null;
+    if (!weightKg || !ctnWeight || !pktWeight || entryType !== 'production') return null;
     
     // Calculate theoretical counts based on weight
     const rawCtn = Number(weightKg) / ctnWeight;
@@ -113,7 +113,7 @@ export const DataEntry: React.FC<DataEntryProps> = ({ onSave, onCancel, initialD
       selectedSize !== '' &&
       weightKg !== '';
       
-    if (entryType === 'dispatch') return commonValid;
+    if (entryType === 'dispatch' || entryType === 'return') return commonValid;
     return commonValid && cartonCtn !== '' && rejectedKg !== '' && duplesPkt !== '';
   }, [date, selectedFamily, selectedType, batchNo, selectedSize, weightKg, rejectedKg, duplesPkt, cartonCtn, entryType]);
 
@@ -128,9 +128,9 @@ export const DataEntry: React.FC<DataEntryProps> = ({ onSave, onCancel, initialD
       batchNo: batchNo.toUpperCase(),
       size: selectedSize,
       weightKg: Number(weightKg),
-      rejectedKg: entryType === 'dispatch' ? 0 : Number(rejectedKg),
-      duplesPkt: entryType === 'dispatch' ? 0 : Number(duplesPkt),
-      cartonCtn: entryType === 'dispatch' ? 0 : Number(cartonCtn),
+      rejectedKg: (entryType === 'dispatch' || entryType === 'return') ? (Number(rejectedKg) || 0) : Number(rejectedKg),
+      duplesPkt: (entryType === 'dispatch' || entryType === 'return') ? 0 : Number(duplesPkt),
+      cartonCtn: (entryType === 'dispatch' || entryType === 'return') ? 0 : Number(cartonCtn),
       notes: notes,
       timestamp: initialData ? initialData.timestamp : Date.now(),
       isReturn: entryType === 'return',
@@ -313,7 +313,7 @@ export const DataEntry: React.FC<DataEntryProps> = ({ onSave, onCancel, initialD
                   step="0.01"
                   value={weightKg}
                   onChange={(e) => setWeightKg(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                  className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 outline-none font-bold text-gray-800 ${entryType === 'dispatch' ? 'focus:ring-red-500' : 'focus:ring-green-500'}`}
+                  className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 outline-none font-bold text-gray-800 ${entryType === 'dispatch' ? 'focus:ring-red-500' : entryType === 'return' ? 'focus:ring-orange-500' : 'focus:ring-green-500'}`}
                 />
                 {suggestions && (
                   <div className="absolute right-3 top-2.5 flex items-center gap-1 text-xs text-gray-400 font-bold bg-gray-50 px-2 py-0.5 rounded">
@@ -323,45 +323,33 @@ export const DataEntry: React.FC<DataEntryProps> = ({ onSave, onCancel, initialD
                 )}
               </div>
            </div>
-           {entryType !== 'dispatch' && (
-             <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                   {entryType === 'return' ? "Returned as Rejected (Kgs)" : "Rejected in Kgs"}
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={rejectedKg}
-                  onChange={(e) => setRejectedKg(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
-                />
-             </div>
-           )}
-           {entryType === 'dispatch' && (
-              <div className="flex flex-col justify-end">
-                  <div className="bg-red-50 text-red-600 p-2.5 rounded-lg border border-red-100 text-xs font-medium flex items-center gap-2">
-                    <Truck size={16} /> 
-                    <span>Deducts weight from Finished Goods. No material packing needed.</span>
-                  </div>
-              </div>
-           )}
+           <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                 {entryType === 'return' ? "Returned as Rejected (Kgs)" : entryType === 'dispatch' ? "Deducted Rejected (Optional Kgs)" : "Rejected in Kgs"}
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={rejectedKg}
+                onChange={(e) => setRejectedKg(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 outline-none ${entryType === 'dispatch' ? 'focus:ring-red-500' : entryType === 'return' ? 'focus:ring-orange-500' : 'focus:ring-red-500'}`}
+              />
+           </div>
         </div>
 
-        {/* 7. Duples & 8. Carton - Hidden for Dispatch */}
-        {entryType !== 'dispatch' && (
+        {/* 7. Duples & 8. Carton - Hidden for Dispatch and Return */}
+        {entryType === 'production' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-gray-50 p-4 rounded-xl border border-gray-200">
              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {entryType === 'return' ? 'Good Duples (PKT)' : 'Duples (PKT)'}
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Duples (PKT)</label>
                 <div className="relative">
                   <input
                     type="number"
                     min="0"
                     value={duplesPkt}
                     onChange={(e) => setDuplesPkt(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                    className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 outline-none ${entryType === 'return' ? 'focus:ring-orange-500' : 'focus:ring-blue-500'}`}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 outline-none focus:ring-blue-500"
                   />
                 </div>
                 {suggestions && (
@@ -372,16 +360,14 @@ export const DataEntry: React.FC<DataEntryProps> = ({ onSave, onCancel, initialD
                 )}
              </div>
              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {entryType === 'return' ? 'Good Carton (CTN)' : 'Carton (CTN)'}
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Carton (CTN)</label>
                 <div className="relative">
                   <input
                     type="number"
                     min="0"
                     value={cartonCtn}
                     onChange={(e) => setCartonCtn(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                    className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 outline-none font-semibold ${entryType === 'return' ? 'focus:ring-orange-500' : 'focus:ring-blue-500'}`}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 outline-none focus:ring-blue-500 font-semibold"
                   />
                 </div>
                  {suggestions && (
@@ -392,6 +378,18 @@ export const DataEntry: React.FC<DataEntryProps> = ({ onSave, onCancel, initialD
                 )}
              </div>
           </div>
+        )}
+
+        {/* Info Box for Dispatch/Return */}
+        {entryType !== 'production' && (
+           <div className={`p-3 rounded-lg border text-xs font-medium flex items-center gap-2 ${entryType === 'dispatch' ? 'bg-red-50 text-red-600 border-red-100' : 'bg-orange-50 text-orange-600 border-orange-100'}`}>
+              {entryType === 'dispatch' ? <Truck size={16} /> : <RotateCcw size={16} />}
+              <span>
+                {entryType === 'dispatch' 
+                  ? "Deducts weight from Finished Goods. No material packing needed." 
+                  : "Adds weight back to Finished Goods. No material packing needed."}
+              </span>
+           </div>
         )}
 
         {/* Notes */}
