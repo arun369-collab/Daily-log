@@ -1,12 +1,10 @@
 
-// ... (Imports)
 import React, { useState, useMemo } from 'react';
 import { ProductionRecord, PackingStockItem, StockTransaction } from '../types';
 import { getStockTransactions, saveStockTransaction, deleteStockTransaction } from '../services/storageService';
-import { Package, Plus, ArrowDown, Search, RefreshCw, Lock, AlertTriangle, Info, Calendar, History, Trash2, X } from 'lucide-react';
+import { Package, Plus, ArrowDown, Search, RefreshCw, Lock, AlertTriangle, Calendar, History, Trash2, X, Download } from 'lucide-react';
 import { PRODUCT_CATALOG } from '../data/products';
 
-// ... (Configuration and Master Data remain exactly same as previous state)
 // Records ON or AFTER this date will be deducted from Opening Stock.
 const STOCK_CALCULATION_START_DATE = '2024-12-01';
 
@@ -78,96 +76,57 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
   // Transactions State
   const [transactions, setTransactions] = useState<StockTransaction[]>(getStockTransactions());
 
-  // --- Logic to Map Production to Packaging Material ---
+  // Logic to Map Production to Packaging Material
   const resolveMaterialIds = (record: ProductionRecord): { packetId: string | null, cartonId: string | null } => {
-    // Determine Product Definition
-    const def = PRODUCT_CATALOG.find(p => p.displayName === record.productName);
     const prodName = record.productName.toUpperCase();
     const size = record.size;
+    const approxPktWeight = record.duplesPkt > 0 ? (record.weightKg / record.duplesPkt) : 0;
 
-    // Default IDs
     let packetId: string | null = null;
     let cartonId: string | null = null;
 
-    // Calculate approximate packet weight to distinguish variants
-    const approxPktWeight = record.duplesPkt > 0 ? (record.weightKg / record.duplesPkt) : 0;
-
-    // --- PACKET MAPPING ---
-    if (def?.type === 'Container' || prodName.includes('SPARKWELD NI')) {
-        // Ni (Gold) -> F29 (PB1002)
-        // NiFe (Silver) -> (PB1001)
-        if (def?.family === 'Ni' || prodName === 'SPARKWELD NI') {
-             packetId = 'PB1002'; // Gold (F29)
-        } else if (def?.family === 'NiFe' || prodName === 'SPARKWELD NIFE') {
-             packetId = 'PB1001'; // Silver
-        }
-        
-        // Both use F14 (6013 Carton / PC1003)
+    if (prodName.includes('NI') || prodName.includes('NIFE')) {
+        if (prodName.includes('NIFE')) packetId = 'PB1001';
+        else packetId = 'PB1002';
         cartonId = 'PC1003'; 
     } 
-    else if (def?.type === 'Vacuum' || prodName.includes('VACUUM')) {
-        
-        // SPECIFIC RULE: Vacuum 7018 with 350mm length
-        // Logic: Packet = PD1006 (F9), Carton = PC1005 (F16)
+    else if (prodName.includes('VACUUM')) {
         if (prodName.includes('7018') && size.includes('350')) {
              packetId = 'PD1006';
              cartonId = 'PC1005';
-        } 
-        else {
-             // Fallback Vacuum Logic
-             if (approxPktWeight >= 1.5 && approxPktWeight <= 2.5) {
-                packetId = 'PD1006'; // Plain Vac 2kg (F9)
-             }
-             cartonId = 'PC1005'; // Vacuum Carton (F16)
+        } else {
+             if (approxPktWeight >= 1.5 && approxPktWeight <= 2.5) packetId = 'PD1006';
+             cartonId = 'PC1005';
         }
     } 
     else {
-        // --- NORMAL PACKETS (6013 / 7018) ---
-        
         if (prodName.includes('6013')) {
-           cartonId = 'PC1003'; // 6013 Standard Carton (F14)
-           
-           // Packet Selection based on weight
-           if (approxPktWeight > 3.5 && approxPktWeight < 4.5) {
-             packetId = 'PD1001'; // 4kg (F4)
-           } else if (approxPktWeight > 1.5 && approxPktWeight < 2.5) {
-             packetId = 'PD1005'; // 2kg
-           } else if (approxPktWeight > 4.5) {
-             packetId = 'PD1007'; // 5kg
-           } else {
-             packetId = 'PD1001'; // Default to 4kg if unclear
-           }
+           cartonId = 'PC1003';
+           if (approxPktWeight > 3.5 && approxPktWeight < 4.5) packetId = 'PD1001';
+           else if (approxPktWeight > 1.5 && approxPktWeight < 2.5) packetId = 'PD1005';
+           else if (approxPktWeight > 4.5) packetId = 'PD1007';
+           else packetId = 'PD1001';
         }
         else if (prodName.includes('7018')) {
-           cartonId = 'PC1002'; // 7018 Standard Carton
-           
-           // Packet Selection
-           if (approxPktWeight > 4.5) {
-             packetId = 'PD1002'; // 5kg
-           } else if (approxPktWeight > 2.0 && approxPktWeight < 3.0) {
-             packetId = 'PD1004'; // 2.5kg
-           } else {
-             packetId = 'PD1002'; // Default to 5kg
-           }
+           cartonId = 'PC1002';
+           if (approxPktWeight > 4.5) packetId = 'PD1002';
+           else if (approxPktWeight > 2.0 && approxPktWeight < 3.0) packetId = 'PD1004';
+           else packetId = 'PD1002';
         }
     }
-
     return { packetId, cartonId };
   };
 
-  // --- Main Calculation ---
   const { stockData } = useMemo(() => {
-    // 1. Initialize with Master List
     const calculatedData = MASTER_STOCK_LIST.map(item => ({
       ...item,
       inward: 0,
       issued: 0,
       available: item.openingStock,
-      breakdown: [] as BreakdownItem[], // Track issue sources
-      inwardBreakdown: [] as BreakdownItem[] // Track inward sources
+      breakdown: [] as BreakdownItem[],
+      inwardBreakdown: [] as BreakdownItem[]
     }));
 
-    // 2. Process Inward Transactions (Manual)
     transactions.forEach(txn => {
         const item = calculatedData.find(i => i.id === txn.itemId);
         if (item) {
@@ -181,70 +140,41 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
         }
     });
 
-    // 3. Process Issues (From Production Records) starting Dec 1st
     records.forEach(record => {
-        // Skip if before calculation date OR if it is a RETURN (Returns don't consume empty boxes)
-        if (record.date < STOCK_CALCULATION_START_DATE) return;
-        if (record.isReturn) return;
-
+        if (record.date < STOCK_CALCULATION_START_DATE || record.isReturn) return;
         const { packetId, cartonId } = resolveMaterialIds(record);
 
-        // Deduct Packets
         if (packetId) {
             const pktItem = calculatedData.find(i => i.id === packetId);
             if (pktItem) {
                 pktItem.issued += record.duplesPkt;
                 pktItem.available -= record.duplesPkt;
-                pktItem.breakdown.push({
-                  date: record.date,
-                  batch: record.batchNo,
-                  qty: record.duplesPkt
-                });
+                pktItem.breakdown.push({ date: record.date, batch: record.batchNo, qty: record.duplesPkt });
             }
-
-            // SPECIAL RULE: F27 (VP1002) updates same as F9 (PD1006)
             if (packetId === 'PD1006') {
                  const foilItem = calculatedData.find(i => i.id === 'VP1002');
                  if (foilItem) {
                      foilItem.issued += record.duplesPkt;
                      foilItem.available -= record.duplesPkt;
-                     foilItem.breakdown.push({
-                       date: record.date,
-                       batch: record.batchNo,
-                       qty: record.duplesPkt
-                     });
+                     foilItem.breakdown.push({ date: record.date, batch: record.batchNo, qty: record.duplesPkt });
                  }
             }
         }
-
-        // Deduct Cartons
         if (cartonId) {
             const ctnItem = calculatedData.find(i => i.id === cartonId);
             if (ctnItem) {
                 ctnItem.issued += record.cartonCtn;
                 ctnItem.available -= record.cartonCtn;
-                ctnItem.breakdown.push({
-                  date: record.date,
-                  batch: record.batchNo,
-                  qty: record.cartonCtn
-                });
+                ctnItem.breakdown.push({ date: record.date, batch: record.batchNo, qty: record.cartonCtn });
             }
         }
     });
 
-    // 4. Mark Low Stock
-    const finalData = calculatedData.map(item => ({
-        ...item,
-        isLow: item.lowStockThreshold ? item.available <= item.lowStockThreshold : item.available <= 0
-    }));
-
-    return { stockData: finalData };
+    return { stockData: calculatedData };
   }, [records, transactions, refreshKey]);
 
-  // ... (Rest of component remains exactly same, only the calculation block above changed)
   const handleSaveInward = () => {
     if (!inwardModalItem || !inwardQty || !inwardDate) return;
-    
     const txn: StockTransaction = {
       id: crypto.randomUUID(),
       itemId: inwardModalItem.id,
@@ -253,275 +183,233 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
       type: 'INWARD',
       notes: 'Manual Entry'
     };
-
-    const updated = saveStockTransaction(txn);
-    setTransactions(updated);
+    setTransactions(saveStockTransaction(txn));
     setInwardModalItem(null);
     setInwardQty('');
-    setInwardDate(new Date().toISOString().split('T')[0]);
   };
 
   const handleDeleteTransaction = (id: string) => {
-    if (window.confirm("Are you sure you want to delete this inward entry?")) {
-        const updated = deleteStockTransaction(id);
-        setTransactions(updated);
+    if (window.confirm("Delete this inward entry?")) {
+        setTransactions(deleteStockTransaction(id));
     }
   };
 
   const filteredStock = stockData.filter(s => 
-    s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    s.id.toLowerCase().includes(searchTerm.toLowerCase())
+    s.name.toLowerCase().includes(searchTerm.toLowerCase()) || s.id.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const handleExport = () => {
+    const headers = ["ID", "Item No", "Product Name", "BF Qty (Nov 30)", "Inward", "Issues", "Available", "Unit", "Remark"];
+    const rows = filteredStock.map(r => [
+      r.id, r.itemNo, `"${r.name}"`, r.openingStock, r.inward, r.issued, r.available, r.unit, `"${r.remark}"`
+    ]);
+    const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+    const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Packing_Stock_Report_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row items-center gap-4">
-        <div className="bg-amber-100 p-3 rounded-lg text-amber-700">
-          <Package size={24} />
-        </div>
-        <div className="flex-1">
-          <h2 className="text-xl font-bold text-gray-800">Packing Material Stock</h2>
-          <div className="flex flex-wrap items-center gap-4 text-sm mt-1">
-             <div className="flex items-center gap-1 text-green-700 bg-green-50 px-2 py-1 rounded border border-green-100">
-                <RefreshCw size={14} /> 
-                <span><strong>Live Calculation:</strong> Auto-deducting issues from Dec 1st</span>
-             </div>
-             <div className="flex items-center gap-1 text-gray-500">
-                <Lock size={14} /> 
-                <span>BF Date: Nov 30th</span>
-             </div>
+      {/* Search Header Area */}
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          <div className="bg-amber-100 p-3 rounded-lg text-amber-700">
+            <Package size={24} />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-gray-800">Packing Stock</h2>
+            <p className="text-sm text-gray-500">Live Inventory Management</p>
           </div>
         </div>
-        <div className="flex gap-2 w-full md:w-auto">
-          <div className="relative flex-1 md:w-64">
+
+        <div className="flex items-center gap-3 w-full md:w-auto">
+           <div className="relative flex-1 md:w-64">
              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
              <input 
                type="text" 
-               placeholder="Search items..." 
+               placeholder="Search materials..." 
                value={searchTerm}
                onChange={(e) => setSearchTerm(e.target.value)}
                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg w-full outline-none focus:ring-2 focus:ring-amber-500"
              />
-          </div>
-          <button 
+           </div>
+           <button 
              onClick={() => setShowHistoryModal(true)}
-             className="flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-lg transition-colors font-medium text-sm"
-             title="View & Delete Inward Entries"
-          >
-             <History size={18} /> Log
-          </button>
-          <button 
+             className="p-2 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-lg transition-colors shadow-sm"
+             title="Inward History Log"
+           >
+             <History size={20} />
+           </button>
+           <button 
              onClick={() => setRefreshKey(k => k + 1)}
-             className="p-2 text-gray-500 hover:text-blue-600 bg-gray-50 hover:bg-blue-50 rounded-lg transition-colors"
+             className="p-2 bg-gray-100 text-gray-700 hover:bg-amber-100 hover:text-amber-700 rounded-lg transition-colors shadow-sm"
              title="Refresh Calculations"
-          >
+           >
              <RefreshCw size={20} />
-          </button>
+           </button>
+           <button 
+             onClick={handleExport}
+             className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm font-medium"
+           >
+             <Download size={18} /> <span className="hidden md:inline">Export</span>
+           </button>
         </div>
       </div>
 
-      {/* Stock Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden relative">
+      {/* Styled Excel Table Container */}
+      <div className="bg-white shadow-lg border border-gray-300 overflow-hidden">
+        
+        {/* Title Bar */}
+        <div className="bg-[#4472c4] text-white text-center py-2 font-bold text-lg border-b border-gray-400 uppercase tracking-wider">
+          Packing Material Stock Report
+        </div>
+        
+        {/* Date & Indicator Row */}
+        <div className="bg-white border-b border-black flex justify-between items-center px-4 py-1">
+          <div className="text-[10px] flex items-center gap-4 text-gray-500 font-bold uppercase">
+             <span className="flex items-center gap-1"><Lock size={10} /> Opening: Nov 30</span>
+             <span className="flex items-center gap-1 text-blue-700"><RefreshCw size={10} /> Deductions from: Dec 1st</span>
+          </div>
+          <div className="bg-yellow-300 border border-black px-4 py-1 font-bold text-black flex items-center gap-2 text-sm">
+             Date: {new Date().toLocaleDateString('en-GB')}
+          </div>
+        </div>
+
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-gray-800 text-white uppercase text-xs">
-              <tr>
-                <th className="px-4 py-3">S.NO</th>
-                <th className="px-4 py-3">Item No</th>
-                <th className="px-4 py-3 w-1/3">Product Name</th>
-                <th className="px-4 py-3 text-right bg-gray-700">BF Qty<br/>(Nov 30)</th>
-                <th className="px-4 py-3 text-right bg-green-900 text-green-100">Inward<br/>(+)</th>
-                <th className="px-4 py-3 text-right bg-red-900 text-red-100">Issue Qty<br/>(-)</th>
-                <th className="px-4 py-3 text-right font-bold bg-amber-600">Available<br/>Stock</th>
-                <th className="px-4 py-3">Remark</th>
-                <th className="px-4 py-3 text-center">Action</th>
-              </tr>
+          <table className="w-full text-sm border-collapse">
+            <thead>
+               <tr className="text-black uppercase">
+                 <th className="bg-[#70ad47] border border-black px-3 py-2 text-left font-bold w-12">ID</th>
+                 <th className="bg-[#70ad47] border border-black px-3 py-2 text-left font-bold w-32">Item No</th>
+                 <th className="bg-[#70ad47] border border-black px-3 py-2 text-left font-bold">Product Name</th>
+                 <th className="bg-[#70ad47] border border-black px-3 py-2 text-right font-bold w-32">BF Qty<br/><span className="text-[10px] font-normal">(Nov 30)</span></th>
+                 <th className="bg-[#70ad47] border border-black px-3 py-2 text-right font-bold w-24">Inward</th>
+                 <th className="bg-[#70ad47] border border-black px-3 py-2 text-right font-bold w-24">Issues</th>
+                 <th className="bg-[#70ad47] border border-black px-3 py-2 text-right font-bold w-32 bg-amber-500">Available</th>
+                 <th className="bg-[#70ad47] border border-black px-3 py-2 text-center font-bold w-20">Action</th>
+               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filteredStock.map((item) => (
-                <tr key={item.id} className={`hover:bg-gray-50 ${item.isLow ? 'bg-red-50' : ''}`}>
-                  <td className="px-4 py-3 font-mono text-xs text-gray-500">{item.id}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-gray-500">{item.itemNo || '-'}</td>
-                  <td className="px-4 py-3 font-medium text-gray-900">
-                    {item.name}
-                    {item.isLow && <span className="ml-2 inline-flex text-xs text-red-600 font-bold"><AlertTriangle size={12} /> Low</span>}
-                  </td>
-                  <td className="px-4 py-3 text-right font-medium text-gray-600 bg-gray-50">{item.openingStock.toLocaleString()}</td>
-                  <td 
-                    className="px-4 py-3 text-right font-bold text-green-600 bg-green-50/30 cursor-pointer hover:bg-green-100 transition-colors relative"
-                    onMouseEnter={(e) => {
-                       if (item.inward <= 0) return;
-                       const rect = e.currentTarget.getBoundingClientRect();
-                       setHoveredBreakdown({
-                           x: rect.right,
-                           y: rect.top,
-                           data: item.inwardBreakdown,
-                           itemName: item.name,
-                           type: 'INWARD'
-                       });
-                    }}
-                    onMouseLeave={() => setHoveredBreakdown(null)}
-                  >
-                     {item.inward > 0 ? item.inward.toLocaleString() : '-'}
-                  </td>
-                  <td 
-                    className="px-4 py-3 text-right font-bold text-red-600 bg-red-50/30 cursor-pointer hover:bg-red-100 transition-colors relative"
-                    onMouseEnter={(e) => {
-                       if (item.issued <= 0) return;
-                       const rect = e.currentTarget.getBoundingClientRect();
-                       setHoveredBreakdown({
-                           x: rect.right,
-                           y: rect.top,
-                           data: item.breakdown,
-                           itemName: item.name,
-                           type: 'ISSUE'
-                       });
-                    }}
-                    onMouseLeave={() => setHoveredBreakdown(null)}
-                  >
-                     {item.issued > 0 ? item.issued.toLocaleString() : '-'}
-                  </td>
-                  <td className={`px-4 py-3 text-right font-bold text-lg ${item.isLow ? 'text-red-600' : 'text-gray-800'} bg-amber-50`}>
-                    {item.available.toLocaleString()}
-                  </td>
-                  <td className="px-4 py-3 text-xs text-gray-500">{item.remark}</td>
-                  <td className="px-4 py-3 text-center">
-                    <button 
-                      onClick={() => {
-                        setInwardModalItem(item);
-                        setInwardDate(new Date().toISOString().split('T')[0]); // Reset date to today on open
+            <tbody>
+               {filteredStock.map((row) => (
+                 <tr key={row.id} className="hover:bg-gray-50">
+                    <td className="border border-black px-3 py-1 font-mono text-xs bg-[#e2efda] text-black">
+                      {row.id}
+                    </td>
+                    <td className="border border-black px-3 py-1 font-mono text-xs bg-[#e2efda] text-black">
+                      {row.itemNo || '-'}
+                    </td>
+                    <td className="border border-black px-3 py-1 font-bold bg-[#e2efda] text-black">
+                      {row.name}
+                      {row.available <= 500 && (
+                        <span className="ml-2 text-[10px] text-red-600 bg-white border border-red-200 px-1 rounded animate-pulse">Low Stock</span>
+                      )}
+                    </td>
+                    <td className="border border-black px-3 py-1 text-right font-bold bg-[#e2efda] text-black">
+                      {row.openingStock.toLocaleString()}
+                    </td>
+                    
+                    {/* Inward Column with Hover Log */}
+                    <td 
+                      onMouseEnter={(e) => {
+                        if (row.inward <= 0) return;
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setHoveredBreakdown({ x: rect.right, y: rect.top, data: row.inwardBreakdown, itemName: row.name, type: 'INWARD' });
                       }}
-                      className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                      title="Add Inward Stock"
+                      onMouseLeave={() => setHoveredBreakdown(null)}
+                      className={`border border-black px-3 py-1 text-right bg-[#e2efda] font-bold transition-colors ${row.inward > 0 ? 'text-green-700 cursor-help hover:bg-green-50' : 'text-gray-400'}`}
                     >
-                      <Plus size={18} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                      {row.inward > 0 ? `+${row.inward.toLocaleString()}` : '-'}
+                    </td>
+                    
+                    {/* Issue Column with Hover Log */}
+                    <td 
+                      onMouseEnter={(e) => {
+                        if (row.issued <= 0) return;
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setHoveredBreakdown({ x: rect.right, y: rect.top, data: row.breakdown, itemName: row.name, type: 'ISSUE' });
+                      }}
+                      onMouseLeave={() => setHoveredBreakdown(null)}
+                      className={`border border-black px-3 py-1 text-right bg-[#e2efda] font-bold transition-colors ${row.issued > 0 ? 'text-red-700 cursor-help hover:bg-red-50' : 'text-gray-400'}`}
+                    >
+                      {row.issued > 0 ? `-${row.issued.toLocaleString()}` : '-'}
+                    </td>
+                    
+                    {/* Available Stock */}
+                    <td className={`border border-black px-3 py-1 text-right font-bold bg-[#e2efda] text-lg ${row.available <= 500 ? 'text-red-700' : 'text-black'}`}>
+                       {row.available.toLocaleString()}
+                    </td>
+
+                    {/* Quick Add Action */}
+                    <td className="border border-black px-3 py-1 text-center bg-[#e2efda]">
+                      <button 
+                        onClick={() => { setInwardModalItem(row); setInwardDate(new Date().toISOString().split('T')[0]); }}
+                        className="p-1 bg-white border border-black rounded hover:bg-blue-50 text-blue-700 transition-colors shadow-sm"
+                        title="Add Stock"
+                      >
+                        <Plus size={16} />
+                      </button>
+                    </td>
+                 </tr>
+               ))}
+               
+               {/* Total Row */}
+               <tr className="bg-yellow-100 font-bold border-t-2 border-black text-black">
+                  <td className="border border-black px-3 py-2 text-right" colSpan={3}>Grand Totals:</td>
+                  <td className="border border-black px-3 py-2 text-right">{filteredStock.reduce((acc, curr) => acc + curr.openingStock, 0).toLocaleString()}</td>
+                  <td className="border border-black px-3 py-2 text-right text-green-700">+{filteredStock.reduce((acc, curr) => acc + curr.inward, 0).toLocaleString()}</td>
+                  <td className="border border-black px-3 py-2 text-right text-red-700">-{filteredStock.reduce((acc, curr) => acc + curr.issued, 0).toLocaleString()}</td>
+                  <td className="border border-black px-3 py-2 text-right text-lg">{filteredStock.reduce((acc, curr) => acc + curr.available, 0).toLocaleString()}</td>
+                  <td className="border border-black px-3 py-2 bg-gray-100"></td>
+               </tr>
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Floating Breakdown Tooltip */}
-      {hoveredBreakdown && (() => {
-        // Smart Positioning Logic
-        const viewportHeight = window.innerHeight;
-        const isBottomHalf = hoveredBreakdown.y > viewportHeight / 2;
-        
-        const style: React.CSSProperties = {
-          left: Math.max(10, hoveredBreakdown.x - 300), // Prevent going off-left
-        };
-
-        if (isBottomHalf) {
-           // Position ABOVE the row
-           // 'bottom' is distance from screen bottom to element top
-           style.bottom = viewportHeight - hoveredBreakdown.y + 10;
-           style.transformOrigin = 'bottom right';
-        } else {
-           // Position BELOW/OVER the row
-           style.top = hoveredBreakdown.y - 10;
-           style.transformOrigin = 'top right';
-        }
-
-        return (
+      {/* Floating Log Breakdown (Mirroring style from previous iteration but cleaner) */}
+      {hoveredBreakdown && (
         <div 
-          className="fixed z-50 bg-white shadow-xl border border-gray-200 rounded-lg p-0 w-72 text-sm pointer-events-none overflow-hidden animate-fadeIn"
-          style={style}
+          className="fixed z-50 bg-white shadow-2xl border border-black rounded-sm p-0 w-80 text-xs pointer-events-none overflow-hidden animate-fadeIn"
+          style={{ 
+            left: Math.max(10, hoveredBreakdown.x - 320), 
+            top: hoveredBreakdown.y > window.innerHeight / 2 ? 'auto' : hoveredBreakdown.y - 10,
+            bottom: hoveredBreakdown.y > window.innerHeight / 2 ? window.innerHeight - hoveredBreakdown.y - 10 : 'auto'
+          }}
         >
-          <div className="bg-gray-100 px-3 py-2 border-b border-gray-200 font-bold text-gray-700 text-xs flex justify-between items-center">
-             <span className="truncate max-w-[170px]">{hoveredBreakdown.itemName}</span>
-             <span className={`px-1.5 py-0.5 rounded border ${
-               hoveredBreakdown.type === 'INWARD' 
-                 ? 'bg-green-100 text-green-700 border-green-200'
-                 : 'bg-red-100 text-red-700 border-red-200'
-             }`}>
-               {hoveredBreakdown.type === 'INWARD' ? 'Inward History' : 'Issued Breakdown'}
-             </span>
+          <div className={`${hoveredBreakdown.type === 'INWARD' ? 'bg-green-700' : 'bg-red-700'} text-white px-3 py-1.5 font-bold flex justify-between`}>
+             <span className="truncate w-48">{hoveredBreakdown.itemName}</span>
+             <span>{hoveredBreakdown.type === 'INWARD' ? 'Inward Log' : 'Issue Log'}</span>
           </div>
-          <div className="max-h-64 overflow-y-auto">
-             <table className="w-full text-xs">
-                <thead className="bg-gray-50 text-gray-500 sticky top-0">
+          <div className="max-h-60 overflow-y-auto">
+             <table className="w-full">
+                <thead className="bg-gray-100 text-gray-800 border-b border-black">
                    <tr>
-                      <th className="px-3 py-1 text-left font-medium">Date</th>
-                      <th className="px-2 py-1 text-left font-medium">{hoveredBreakdown.type === 'INWARD' ? 'Ref/Notes' : 'Batch'}</th>
-                      <th className="px-3 py-1 text-right font-medium">Qty</th>
+                      <th className="px-2 py-1 text-left font-bold">Date</th>
+                      <th className="px-2 py-1 text-left font-bold">Reference</th>
+                      <th className="px-2 py-1 text-right font-bold">Qty</th>
                    </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-gray-200">
                    {hoveredBreakdown.data
                      .sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime())
                      .map((entry, idx) => (
-                      <tr key={idx}>
-                         <td className="px-3 py-1 text-gray-600 whitespace-nowrap">{entry.date}</td>
-                         <td className="px-2 py-1 font-mono text-gray-800">{entry.batch}</td>
-                         <td className={`px-3 py-1 text-right font-bold ${hoveredBreakdown.type === 'INWARD' ? 'text-green-600' : 'text-red-600'}`}>{entry.qty}</td>
+                      <tr key={idx} className="hover:bg-yellow-50">
+                         <td className="px-2 py-1 text-gray-800">{entry.date}</td>
+                         <td className="px-2 py-1 font-mono text-gray-600 truncate max-w-[120px]">{entry.batch}</td>
+                         <td className={`px-2 py-1 text-right font-bold ${hoveredBreakdown.type === 'INWARD' ? 'text-green-700' : 'text-red-700'}`}>{entry.qty.toLocaleString()}</td>
                       </tr>
                    ))}
                 </tbody>
              </table>
           </div>
-          <div className="bg-gray-50 px-3 py-2 border-t border-gray-200 text-right text-xs font-bold text-gray-800">
-             Total: {hoveredBreakdown.data.reduce((acc, curr) => acc + curr.qty, 0).toLocaleString()}
-          </div>
-        </div>
-        );
-      })()}
-
-      {/* Inward Modal */}
-      {inwardModalItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden animate-fadeIn">
-            <div className="bg-green-600 px-6 py-4">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <ArrowDown size={20} /> Add Stock Inward
-              </h3>
-              <p className="text-green-100 text-sm truncate">{inwardModalItem.name}</p>
-            </div>
-            <div className="p-6 space-y-4">
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Receipt Date</label>
-                <div className="relative">
-                   <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                   <input 
-                     type="date" 
-                     value={inwardDate}
-                     onChange={(e) => setInwardDate(e.target.value)}
-                     className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none font-medium"
-                   />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Quantity to Add ({inwardModalItem.unit})</label>
-                <input 
-                  type="number" 
-                  autoFocus
-                  value={inwardQty}
-                  onChange={(e) => setInwardQty(e.target.value)}
-                  className="w-full px-4 py-2 border border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-lg font-bold"
-                  placeholder="0"
-                />
-              </div>
-
-              <div className="flex gap-3">
-                <button 
-                  onClick={() => setInwardModalItem(null)}
-                  className="flex-1 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium"
-                >
-                  Cancel
-                </button>
-                <button 
-                  onClick={handleSaveInward}
-                  className="flex-1 py-2 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 shadow-lg shadow-green-200"
-                >
-                  Save Inward
-                </button>
-              </div>
-            </div>
+          <div className="bg-gray-50 px-3 py-1 border-t border-black text-right font-bold text-black">
+             Total {hoveredBreakdown.type === 'INWARD' ? 'Inward' : 'Issued'}: {hoveredBreakdown.data.reduce((acc, curr) => acc + curr.qty, 0).toLocaleString()}
           </div>
         </div>
       )}
@@ -529,9 +417,9 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
       {/* History / Delete Modal */}
       {showHistoryModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[80vh]">
-            <div className="bg-gray-800 px-6 py-4 flex justify-between items-center">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[80vh] border border-black">
+            <div className="bg-gray-800 px-6 py-4 flex justify-between items-center text-white">
+              <h3 className="text-lg font-bold flex items-center gap-2">
                 <History size={20} /> Inward Transaction History
               </h3>
               <button onClick={() => setShowHistoryModal(false)} className="text-gray-400 hover:text-white transition-colors">
@@ -540,33 +428,33 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
             </div>
             
             <div className="p-0 overflow-y-auto flex-1">
-               <table className="w-full text-sm text-left">
-                 <thead className="bg-gray-100 text-gray-600 sticky top-0 border-b border-gray-200">
+               <table className="w-full text-sm text-left border-collapse">
+                 <thead className="bg-[#70ad47] text-black sticky top-0 border-b-2 border-black">
                    <tr>
-                     <th className="px-6 py-3 font-medium">Date</th>
-                     <th className="px-6 py-3 font-medium">Item</th>
-                     <th className="px-6 py-3 font-medium text-right">Qty</th>
-                     <th className="px-6 py-3 font-medium text-center">Action</th>
+                     <th className="px-6 py-3 font-bold">Date</th>
+                     <th className="px-6 py-3 font-bold">Item Description</th>
+                     <th className="px-6 py-3 font-bold text-right">Qty Added</th>
+                     <th className="px-6 py-3 font-bold text-center">Action</th>
                    </tr>
                  </thead>
-                 <tbody className="divide-y divide-gray-100">
+                 <tbody className="divide-y divide-gray-300">
                    {transactions.map(txn => {
                      const item = MASTER_STOCK_LIST.find(i => i.id === txn.itemId);
                      return (
-                       <tr key={txn.id} className="hover:bg-gray-50">
-                         <td className="px-6 py-3 whitespace-nowrap">{txn.date}</td>
-                         <td className="px-6 py-3">
-                           <div className="font-bold text-gray-800">{item?.name || txn.itemId}</div>
-                           <div className="text-xs text-gray-500">{txn.notes}</div>
+                       <tr key={txn.id} className="hover:bg-[#e2efda]/50">
+                         <td className="px-6 py-3 font-bold text-gray-800 whitespace-nowrap border-r border-gray-200">{txn.date}</td>
+                         <td className="px-6 py-3 border-r border-gray-200">
+                           <div className="font-bold text-gray-900">{item?.name || txn.itemId}</div>
+                           <div className="text-[10px] text-gray-500 uppercase tracking-tighter">Reference: {txn.notes}</div>
                          </td>
-                         <td className="px-6 py-3 text-right font-mono font-bold text-green-600">
-                           +{txn.qty}
+                         <td className="px-6 py-3 text-right font-mono font-bold text-green-700 bg-green-50/20 border-r border-gray-200">
+                           +{txn.qty.toLocaleString()}
                          </td>
                          <td className="px-6 py-3 text-center">
                            <button 
                              onClick={() => handleDeleteTransaction(txn.id)}
-                             className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
-                             title="Delete Transaction"
+                             className="p-2 text-red-400 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors border border-transparent hover:border-red-200 shadow-sm"
+                             title="Delete Inward"
                            >
                              <Trash2 size={16} />
                            </button>
@@ -576,7 +464,7 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
                    })}
                    {transactions.length === 0 && (
                      <tr>
-                       <td colSpan={4} className="px-6 py-12 text-center text-gray-400">
+                       <td colSpan={4} className="px-6 py-20 text-center text-gray-400 font-bold uppercase tracking-widest italic opacity-40">
                          No manual inward transactions found.
                        </td>
                      </tr>
@@ -584,10 +472,64 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
                  </tbody>
                </table>
             </div>
-            <div className="p-4 border-t border-gray-200 bg-gray-50 text-right">
-               <button onClick={() => setShowHistoryModal(false)} className="px-6 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium">
-                 Close
+            <div className="p-4 border-t border-black bg-gray-100 text-right flex justify-between items-center">
+               <span className="text-[10px] font-bold text-gray-400 uppercase italic">Admin Controlled Log</span>
+               <button onClick={() => setShowHistoryModal(false)} className="px-6 py-2 bg-white border border-black rounded font-bold text-black hover:bg-gray-50 shadow-md">
+                 CLOSE LOG
                </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Inward Modal */}
+      {inwardModalItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded shadow-2xl w-full max-w-sm overflow-hidden animate-fadeIn border-2 border-black">
+            <div className="bg-[#4472c4] px-6 py-4 border-b border-black">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <ArrowDown size={20} /> STOCK INWARD
+              </h3>
+              <p className="text-blue-100 text-[10px] font-bold uppercase truncate mt-1">{inwardModalItem.name}</p>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Receipt Date</label>
+                <div className="relative">
+                   <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                   <input 
+                     type="date" 
+                     value={inwardDate}
+                     onChange={(e) => setInwardDate(e.target.value)}
+                     className="w-full pl-9 pr-4 py-2 border border-black rounded focus:ring-1 focus:ring-blue-500 outline-none font-bold text-sm"
+                   />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Quantity to Add ({inwardModalItem.unit})</label>
+                <input 
+                  type="number" 
+                  autoFocus
+                  value={inwardQty}
+                  onChange={(e) => setInwardQty(e.target.value)}
+                  className="w-full px-4 py-3 border-2 border-black rounded focus:ring-0 outline-none text-2xl font-bold text-center"
+                  placeholder="0"
+                />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button 
+                  onClick={() => setInwardModalItem(null)}
+                  className="flex-1 py-3 text-gray-600 hover:bg-gray-100 border border-gray-300 rounded font-bold text-sm"
+                >
+                  CANCEL
+                </button>
+                <button 
+                  onClick={handleSaveInward}
+                  className="flex-1 py-3 bg-[#70ad47] text-black border border-black rounded font-black text-sm hover:bg-[#5a8a3a] shadow-lg"
+                >
+                  SAVE INWARD
+                </button>
+              </div>
             </div>
           </div>
         </div>
