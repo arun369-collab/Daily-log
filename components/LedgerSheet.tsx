@@ -72,7 +72,7 @@ export const LedgerSheet: React.FC<LedgerSheetProps> = ({ records }) => {
       filtered = records.filter(r => r.date >= customStart && r.date <= customEnd);
     }
 
-    // Updated sorting to Ascending (oldest first / dec 1st on top)
+    // Ascending Sort (1st of the month at top)
     return [...filtered].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [records, reportType, selectedDate, selectedMonth, selectedWeek, customStart, customEnd]);
 
@@ -256,7 +256,7 @@ export const LedgerSheet: React.FC<LedgerSheetProps> = ({ records }) => {
       </div>
 
       {/* Report Container - Styles adapt for Preview Mode */}
-      <div className={`transition-all duration-300 ${isPreview ? 'p-8 bg-white shadow-2xl border border-gray-200 max-w-5xl mx-auto min-h-[1123px]' : ''}`}>
+      <div className={`transition-all duration-300 ${isPreview ? 'p-8 bg-white shadow-2xl border border-gray-200 max-w-6xl mx-auto min-h-[1123px]' : ''}`}>
         
         {/* Report Title - Centered Bold Header */}
         <div className={`hidden print:block text-center mb-8 pb-4 border-b-2 border-black ${isPreview ? '!block' : ''}`}>
@@ -266,42 +266,42 @@ export const LedgerSheet: React.FC<LedgerSheetProps> = ({ records }) => {
         {/* Table Container */}
         <div className={`bg-white shadow-lg overflow-hidden border border-black print:shadow-none print:border-none print:overflow-visible ${isPreview ? 'shadow-none border-none' : ''}`}>
           <div className="overflow-x-auto print:overflow-visible">
-            <table className="w-full text-sm text-left border-collapse print:table-fixed print:text-[9pt]">
+            <table className="w-full text-sm text-left border-collapse print:table-fixed print:text-[8pt]">
               <thead>
-                <tr className="bg-gray-100 text-black border-b-2 border-black font-bold uppercase text-[10px] tracking-wider print:bg-white print:border-black">
-                  <th className="px-2 py-4 border-r border-black w-24 text-left print:py-2">Date</th>
-                  <th className="px-2 py-4 border-r border-black text-left print:py-2">Product Name</th>
-                  <th className="px-2 py-4 border-r border-black w-24 text-center print:py-2">Batch No</th>
-                  <th className="px-2 py-4 border-r border-black w-24 text-left print:py-2">Size</th>
-                  <th className="px-2 py-4 border-r border-black text-right w-24 print:py-2">Weight<br/><span className="text-[8px]">K.G.S</span></th>
-                  <th className="px-2 py-4 border-r border-black text-right w-24 print:py-2">Rej-Weight<br/><span className="text-[8px]">K.G.S</span></th>
-                  <th className="px-2 py-4 border-r border-black text-right w-24 print:py-2">Duplex<br/><span className="text-[8px]">(PCS/PKT)</span></th>
-                  <th className="px-2 py-4 text-right w-24 print:py-2">Cartoon<br/><span className="text-[8px]">(CTN)</span></th>
+                <tr className="bg-gray-100 text-black border-b-2 border-black font-bold uppercase text-[9px] tracking-wider print:bg-white print:border-black">
+                  <th className="px-1.5 py-4 border-r border-black w-20 text-left print:py-2">Date</th>
+                  <th className="px-1.5 py-4 border-r border-black text-left print:py-2 min-w-[120px]">Product Name</th>
+                  <th className="px-1.5 py-4 border-r border-black w-16 text-center print:py-2">Batch No</th>
+                  <th className="px-1.5 py-4 border-r border-black w-20 text-left print:py-2">Size</th>
+                  <th className="px-1.5 py-4 border-r border-black text-right w-20 print:py-2">Weight<br/><span className="text-[7px]">K.G.S</span></th>
+                  <th className="px-1.5 py-4 border-r border-black text-right w-20 print:py-2">Rej-Weight<br/><span className="text-[7px]">K.G.S</span></th>
+                  <th className="px-1.5 py-4 border-r border-black text-right w-20 print:py-2">Duplex<br/><span className="text-[7px]">(PCS/PKT)</span></th>
+                  <th className="px-1.5 py-4 text-right w-20 print:py-2">Cartoon<br/><span className="text-[7px]">(CTN)</span></th>
                 </tr>
               </thead>
               <tbody className="text-black font-semibold">
                 {filteredRecords.map((r, index) => (
                   <tr 
                     key={r.id} 
-                    className={`border-b border-black print:break-inside-avoid print:h-8 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                    className={`border-b border-black print:break-inside-avoid print:h-8 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
                   >
-                    <td className="px-2 py-2 border-r border-black text-left whitespace-nowrap">{r.date}</td>
-                    <td className="px-2 py-2 border-r border-black text-left">
+                    <td className="px-1.5 py-2 border-r border-black text-left whitespace-nowrap">{r.date}</td>
+                    <td className="px-1.5 py-2 border-r border-black text-left">
                       <span className="block truncate">
                         {r.productName}
-                        {r.isReturn && <span className="ml-1 text-[8px] font-bold text-red-600 uppercase border border-red-200 px-1 rounded bg-red-50">(Returned)</span>}
+                        {r.isReturn && <span className="ml-1 text-[7px] font-bold text-red-600 uppercase border border-red-200 px-1 rounded bg-red-50">(Ret)</span>}
                       </span>
                     </td>
-                    <td className="px-2 py-2 border-r border-black text-center font-mono text-[9pt]">{r.batchNo}</td>
-                    <td className="px-2 py-2 border-r border-black text-left whitespace-nowrap">{r.size}</td>
-                    <td className="px-2 py-2 border-r border-black text-right font-bold">
+                    <td className="px-1.5 py-2 border-r border-black text-center font-mono text-[8pt]">{r.batchNo}</td>
+                    <td className="px-1.5 py-2 border-r border-black text-left whitespace-nowrap">{r.size}</td>
+                    <td className="px-1.5 py-2 border-r border-black text-right font-bold">
                       {r.weightKg.toFixed(2)}
                     </td>
-                    <td className="px-2 py-2 border-r border-black text-right">
+                    <td className="px-1.5 py-2 border-r border-black text-right">
                       {r.rejectedKg > 0 ? r.rejectedKg.toFixed(2) : '-'}
                     </td>
-                    <td className="px-2 py-2 border-r border-black text-right">{r.duplesPkt}</td>
-                    <td className="px-2 py-2 text-right font-bold">{r.cartonCtn}</td>
+                    <td className="px-1.5 py-2 border-r border-black text-right">{r.duplesPkt}</td>
+                    <td className="px-1.5 py-2 text-right font-bold">{r.cartonCtn}</td>
                   </tr>
                 ))}
               </tbody>
@@ -309,18 +309,18 @@ export const LedgerSheet: React.FC<LedgerSheetProps> = ({ records }) => {
               {/* Totals Footer */}
               {filteredRecords.length > 0 && (
                 <tfoot className={`hidden print:table-footer-group bg-gray-100 border-t-2 border-black font-bold print:bg-white ${isPreview ? '!table-footer-group' : ''}`}>
-                   <tr>
-                      <td colSpan={4} className="px-2 py-3 text-right border-r border-black">GRAND TOTALS:</td>
-                      <td className="px-2 py-3 text-right border-r border-black">
+                   <tr className="print:h-10">
+                      <td colSpan={4} className="px-1.5 py-3 text-right border-r border-black uppercase tracking-widest text-[9px]">Grand Totals:</td>
+                      <td className="px-1.5 py-3 text-right border-r border-black font-black text-sm print:text-[9pt]">
                         {filteredRecords.reduce((sum, r) => sum + r.weightKg, 0).toFixed(2)}
                       </td>
-                      <td className="px-2 py-3 text-right border-r border-black">
+                      <td className="px-1.5 py-3 text-right border-r border-black print:text-[9pt]">
                         {filteredRecords.reduce((sum, r) => sum + r.rejectedKg, 0).toFixed(2)}
                       </td>
-                      <td className="px-2 py-3 text-right border-r border-black">
+                      <td className="px-1.5 py-3 text-right border-r border-black print:text-[9pt]">
                          {filteredRecords.reduce((sum, r) => sum + r.duplesPkt, 0).toLocaleString()}
                       </td>
-                      <td className="px-2 py-3 text-right">
+                      <td className="px-1.5 py-3 text-right font-black text-sm print:text-[9pt]">
                          {filteredRecords.reduce((sum, r) => sum + r.cartonCtn, 0).toLocaleString()}
                       </td>
                    </tr>
