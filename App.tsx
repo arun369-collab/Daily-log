@@ -22,7 +22,8 @@ import {
   PieChart,
   ClipboardList,
   Menu,
-  X
+  X,
+  Brain
 } from 'lucide-react';
 import { ViewState, ProductionRecord, UserRole, SalesOrder } from './types';
 import { getRecords, saveRecord, deleteRecord, getSalesOrders, saveSalesOrder, deleteSalesOrder, deleteSalesOrders } from './services/storageService';
@@ -41,6 +42,7 @@ import { CustomerDatabase } from './components/CustomerDatabase';
 import { PackingStock } from './components/PackingStock';
 import { VisualAnalytics } from './components/VisualAnalytics';
 import { FinishedGoodsStock } from './components/FinishedGoodsStock';
+import { CustomerBehaviour } from './components/CustomerBehaviour';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -268,7 +270,7 @@ function App() {
   const canAccess = (feature: ViewState) => {
     if (userRole === 'admin') return true;
     if (userRole === 'yadav') return ['dashboard', 'entry', 'ledger_sheet', 'packing_stock', 'analytics'].includes(feature);
-    if (userRole === 'sales') return ['sales_dashboard', 'sales_entry', 'customers', 'finished_goods'].includes(feature);
+    if (userRole === 'sales') return ['sales_dashboard', 'sales_entry', 'customers', 'customer_behaviour'].includes(feature);
     return false;
   };
 
@@ -332,6 +334,7 @@ function App() {
                {canAccess('sales_dashboard') && <NavItem target="sales_dashboard" icon={ShoppingBag} label="My Orders" />}
                {canAccess('sales_entry') && <NavItem target="sales_entry" icon={ShoppingCart} label="New Order" />}
                {canAccess('customers') && <NavItem target="customers" icon={Users} label="Customers" />}
+               {canAccess('customer_behaviour') && <NavItem target="customer_behaviour" icon={Brain} label="Intelligence" />}
             </div>
           )}
         </nav>
@@ -373,6 +376,7 @@ function App() {
               {view === 'sales_dashboard' && 'Sales Dashboard'}
               {view === 'sales_entry' && (editingOrder ? 'Edit Order' : 'New Sales Order')}
               {view === 'customers' && 'Customer Database'}
+              {view === 'customer_behaviour' && 'Customer Intelligence'}
             </h1>
             <p className="text-gray-500 text-sm mt-1 print:hidden hidden md:block">
               Welcome, <span className="capitalize font-semibold">{username}</span>.
@@ -432,6 +436,8 @@ function App() {
           )}
 
           {canAccess('customers') && view === 'customers' && <CustomerDatabase />}
+
+          {canAccess('customer_behaviour') && view === 'customer_behaviour' && <CustomerBehaviour orders={salesOrders} />}
 
           {canAccess('history') && view === 'history' && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden print:shadow-none print:border-none">
@@ -550,7 +556,7 @@ function App() {
                   <Plus size={32} />
                 </button>
              </div>
-             <MobileNavIcon target="finished_goods" icon={ClipboardList} label="Stock" />
+             <MobileNavIcon target="customer_behaviour" icon={Brain} label="Intelligence" />
              <button 
                onClick={() => setIsMobileMenuOpen(true)}
                className="flex flex-col items-center justify-center w-full h-full space-y-1 text-gray-400"
@@ -633,6 +639,12 @@ function App() {
                  <button onClick={() => { setView('customers'); setIsMobileMenuOpen(false); }} className="flex flex-col items-center p-4 bg-blue-50 rounded-2xl text-blue-700">
                     <Users size={32} className="mb-2" />
                     <span className="text-sm font-bold">Clients</span>
+                 </button>
+               )}
+               {canAccess('customer_behaviour') && (
+                 <button onClick={() => { setView('customer_behaviour'); setIsMobileMenuOpen(false); }} className="flex flex-col items-center p-4 bg-indigo-50 rounded-2xl text-indigo-700">
+                    <Brain size={32} className="mb-2" />
+                    <span className="text-sm font-bold">Intelligence</span>
                  </button>
                )}
                {canAccess('settings') && (

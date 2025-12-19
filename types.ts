@@ -92,6 +92,6 @@ export interface StockTransaction {
   notes?: string;
 }
 
-export type ViewState = 'dashboard' | 'entry' | 'history' | 'batches' | 'dispatch' | 'settings' | 'ledger_sheet' | 'sales_entry' | 'sales_dashboard' | 'customers' | 'packing_stock' | 'analytics' | 'finished_goods';
+export type ViewState = 'dashboard' | 'entry' | 'history' | 'batches' | 'dispatch' | 'settings' | 'ledger_sheet' | 'sales_entry' | 'sales_dashboard' | 'customers' | 'packing_stock' | 'analytics' | 'finished_goods' | 'customer_behaviour';
 
 export type UserRole = 'admin' | 'yadav' | 'sales';
