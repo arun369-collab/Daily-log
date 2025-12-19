@@ -32,6 +32,14 @@ export const LedgerSheet: React.FC<LedgerSheetProps> = ({ records }) => {
   const [customStart, setCustomStart] = useState(new Date().toISOString().split('T')[0]);
   const [customEnd, setCustomEnd] = useState(new Date().toISOString().split('T')[0]);
 
+  // Helper to format date for display: YYYY-MM-DD -> DD-MM-YYYY
+  const formatDisplayDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return dateStr;
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  };
+
   // Helper: Get Date Range from Week String (YYYY-Www)
   const getWeekRange = (weekStr: string) => {
     const [year, week] = weekStr.split('-W').map(Number);
@@ -79,16 +87,16 @@ export const LedgerSheet: React.FC<LedgerSheetProps> = ({ records }) => {
   // Dynamic Title for the Report
   const reportTitle = useMemo(() => {
     if (reportType === 'daily') {
-      return `Production Report of ${selectedDate}`;
+      return `Production Report of ${formatDisplayDate(selectedDate)}`;
     } else if (reportType === 'monthly') {
       const [year, month] = selectedMonth.split('-');
       const monthName = new Date(parseInt(year), parseInt(month) - 1).toLocaleString('default', { month: 'long' });
       return `Production Report of ${monthName} ${year}`;
     } else if (reportType === 'weekly') {
        const { start, end } = getWeekRange(selectedWeek);
-       return `Production Report: ${start} to ${end}`;
+       return `Production Report: ${formatDisplayDate(start)} to ${formatDisplayDate(end)}`;
     } else if (reportType === 'custom') {
-      return `Production Report: ${customStart} to ${customEnd}`;
+      return `Production Report: ${formatDisplayDate(customStart)} to ${formatDisplayDate(customEnd)}`;
     }
     return 'Production Ledger (All Time)';
   }, [reportType, selectedDate, selectedMonth, selectedWeek, customStart, customEnd]);
@@ -101,8 +109,6 @@ export const LedgerSheet: React.FC<LedgerSheetProps> = ({ records }) => {
     <div className="space-y-6">
       {/* Header & Controls - Hidden on Print */}
       <div className="print:hidden space-y-4">
-        
-        {/* Normal Header (Hidden in Preview) */}
         {!isPreview && (
           <div className="flex items-center gap-3">
             <div className="p-3 bg-indigo-100 text-indigo-700 rounded-lg">
@@ -115,7 +121,6 @@ export const LedgerSheet: React.FC<LedgerSheetProps> = ({ records }) => {
           </div>
         )}
 
-        {/* Preview Toolbar (Visible only in Preview) */}
         {isPreview && (
           <div className="bg-gray-800 text-white p-4 rounded-xl flex justify-between items-center shadow-lg animate-fadeIn">
             <div className="flex items-center gap-3">
@@ -142,12 +147,9 @@ export const LedgerSheet: React.FC<LedgerSheetProps> = ({ records }) => {
           </div>
         )}
 
-        {/* Report Filter Controls (Hidden in Preview) */}
         {!isPreview && (
           <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col xl:flex-row gap-4 xl:items-end justify-between">
             <div className="flex flex-col md:flex-row gap-4 w-full">
-              
-              {/* Report Type Selector */}
               <div className="w-full md:w-48 flex-shrink-0">
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Report Period</label>
                 <div className="relative">
@@ -166,7 +168,6 @@ export const LedgerSheet: React.FC<LedgerSheetProps> = ({ records }) => {
                 </div>
               </div>
 
-              {/* Date Pickers based on Type */}
               <div className="flex-1 animate-fadeIn">
                 {reportType === 'daily' && (
                   <div className="w-full md:w-48">
@@ -179,7 +180,6 @@ export const LedgerSheet: React.FC<LedgerSheetProps> = ({ records }) => {
                     />
                   </div>
                 )}
-
                 {reportType === 'weekly' && (
                   <div className="w-full md:w-56">
                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Select Week</label>
@@ -191,7 +191,6 @@ export const LedgerSheet: React.FC<LedgerSheetProps> = ({ records }) => {
                     />
                   </div>
                 )}
-
                 {reportType === 'monthly' && (
                   <div className="w-full md:w-48">
                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Select Month</label>
@@ -206,7 +205,6 @@ export const LedgerSheet: React.FC<LedgerSheetProps> = ({ records }) => {
                     </div>
                   </div>
                 )}
-
                 {reportType === 'custom' && (
                   <div className="flex items-center gap-2">
                     <div className="flex-1">
@@ -255,24 +253,20 @@ export const LedgerSheet: React.FC<LedgerSheetProps> = ({ records }) => {
         )}
       </div>
 
-      {/* Report Container - Styles adapt for Preview Mode */}
       <div className={`transition-all duration-300 ${isPreview ? 'p-8 bg-white shadow-2xl border border-gray-200 max-w-6xl mx-auto min-h-[1123px]' : ''}`}>
-        
-        {/* Report Title - Centered Bold Header */}
         <div className={`hidden print:block text-center mb-8 pb-4 border-b-2 border-black ${isPreview ? '!block' : ''}`}>
           <h1 className="text-3xl font-black text-black uppercase tracking-[0.1em]">{reportTitle}</h1>
         </div>
 
-        {/* Table Container */}
         <div className={`bg-white shadow-lg overflow-hidden border border-black print:shadow-none print:border-none print:overflow-visible ${isPreview ? 'shadow-none border-none' : ''}`}>
           <div className="overflow-x-auto print:overflow-visible">
             <table className="w-full text-sm text-left border-collapse print:table-fixed print:text-[8pt]">
               <thead>
                 <tr className="bg-gray-100 text-black border-b-2 border-black font-bold uppercase text-[9px] tracking-wider print:bg-white print:border-black">
-                  <th className="px-1.5 py-4 border-r border-black w-20 text-left print:py-2">Date</th>
-                  <th className="px-1.5 py-4 border-r border-black text-left print:py-2 min-w-[120px]">Product Name</th>
+                  <th className="px-1.5 py-4 border-r border-black w-24 text-left print:py-2">Date</th>
+                  <th className="px-1.5 py-4 border-r border-black text-left print:py-2 min-w-[140px]">Product Name</th>
                   <th className="px-1.5 py-4 border-r border-black w-16 text-center print:py-2">Batch No</th>
-                  <th className="px-1.5 py-4 border-r border-black w-20 text-left print:py-2">Size</th>
+                  <th className="px-1.5 py-4 border-r border-black w-24 text-left print:py-2">Size</th>
                   <th className="px-1.5 py-4 border-r border-black text-right w-20 print:py-2">Weight<br/><span className="text-[7px]">K.G.S</span></th>
                   <th className="px-1.5 py-4 border-r border-black text-right w-20 print:py-2">Rej-Weight<br/><span className="text-[7px]">K.G.S</span></th>
                   <th className="px-1.5 py-4 border-r border-black text-right w-20 print:py-2">Duplex<br/><span className="text-[7px]">(PCS/PKT)</span></th>
@@ -285,9 +279,9 @@ export const LedgerSheet: React.FC<LedgerSheetProps> = ({ records }) => {
                     key={r.id} 
                     className={`border-b border-black print:break-inside-avoid print:h-8 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
                   >
-                    <td className="px-1.5 py-2 border-r border-black text-left whitespace-nowrap">{r.date}</td>
+                    <td className="px-1.5 py-2 border-r border-black text-left whitespace-nowrap">{formatDisplayDate(r.date)}</td>
                     <td className="px-1.5 py-2 border-r border-black text-left">
-                      <span className="block truncate">
+                      <span className="block leading-tight">
                         {r.productName}
                         {r.isReturn && <span className="ml-1 text-[7px] font-bold text-red-600 uppercase border border-red-200 px-1 rounded bg-red-50">(Ret)</span>}
                       </span>
@@ -306,7 +300,6 @@ export const LedgerSheet: React.FC<LedgerSheetProps> = ({ records }) => {
                 ))}
               </tbody>
               
-              {/* Totals Footer */}
               {filteredRecords.length > 0 && (
                 <tfoot className={`hidden print:table-footer-group bg-gray-100 border-t-2 border-black font-bold print:bg-white ${isPreview ? '!table-footer-group' : ''}`}>
                    <tr className="print:h-10">

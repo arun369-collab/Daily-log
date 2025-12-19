@@ -17,6 +17,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ records }) => {
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [loadingAi, setLoadingAi] = useState(false);
 
+  const formatDisplayDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return dateStr;
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  };
+
   // Memoized computations for performance
   const stats = useMemo(() => {
     // ONLY count production (Exclude dispatch and returns from production volume)
@@ -143,7 +150,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ records }) => {
                  <tbody className="divide-y divide-gray-100">
                     {records.slice(0, 5).map(r => (
                       <tr key={r.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-3">{r.date}</td>
+                        <td className="px-6 py-3">{formatDisplayDate(r.date)}</td>
                         <td className="px-6 py-3 font-mono text-xs text-gray-600">{r.batchNo}</td>
                         <td className="px-6 py-3">
                            {r.isDispatch ? (

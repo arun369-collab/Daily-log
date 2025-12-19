@@ -62,6 +62,13 @@ function App() {
   // Sync State
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
 
+  const formatDisplayDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return dateStr;
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  };
+
   useEffect(() => {
     // Check session storage for existing auth
     const storedAuth = sessionStorage.getItem('factory_flow_auth');
@@ -463,7 +470,7 @@ function App() {
                   <tbody className="divide-y divide-gray-100">
                     {displayRecords.map((r) => (
                       <tr key={r.id} className="hover:bg-gray-50 transition-colors print:hover:bg-transparent">
-                        <td className="px-4 py-4 whitespace-nowrap">{r.date}</td>
+                        <td className="px-4 py-4 whitespace-nowrap">{formatDisplayDate(r.date)}</td>
                         <td className="px-4 py-4 font-mono text-xs text-gray-600 font-bold">{r.batchNo}</td>
                         <td className="px-4 py-4">
                           <div className="font-medium text-gray-900 line-clamp-1 flex items-center gap-2">
