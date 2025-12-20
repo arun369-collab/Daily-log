@@ -1,10 +1,65 @@
 
 import React, { useState, useMemo } from 'react';
 import { SalesOrder, UserRole, ProductionRecord } from '../types';
-import { ShoppingBag, MapPin, FileText, CheckCircle, Clock, Eye, X, MessageCircle, Copy, Share2, Printer, ExternalLink, Pencil, Truck, Package, RefreshCw, ClipboardList, Plus, Trash2 } from 'lucide-react';
+import { ShoppingBag, MapPin, FileText, CheckCircle, Clock, Eye, X, MessageCircle, Copy, Share2, Printer, ExternalLink, Pencil, Truck, Package, RefreshCw, ClipboardList, Plus, Trash2, AlertCircle, CheckCircle2, Box } from 'lucide-react';
 import { POPreview } from './POPreview';
 import { DeliveryLedger } from './DeliveryLedger';
 import { saveSalesOrder, deleteSalesOrder, deleteSalesOrders } from '../services/storageService';
+
+// Standard Master Inventory Data for initial opening balances
+const MASTER_FG_OPENING = [
+  { product: 'SPARKWELD 6013', size: '2.6 x 350', opening: 2214 },
+  { product: 'SPARKWELD 6013', size: '3.2 x 350', opening: 4204 },
+  { product: 'SPARKWELD 6013', size: '4.0 x 350', opening: 3388 },
+  { product: 'SPARKWELD 6013', size: '4.0 x 400', opening: 1575 },
+  { product: 'SPARKWELD 6013', size: '5.0 x 350', opening: 148 },
+  { product: 'SPARKWELD 7018', size: '2.5 x 350', opening: 2465 },
+  { product: 'SPARKWELD 7018', size: '3.2 X 350', opening: 725 },
+  { product: 'SPARKWELD 7018', size: '3.2 x 450', opening: 2265 },
+  { product: 'SPARKWELD 7018', size: '4.0 X 350', opening: 2220 },
+  { product: 'SPARKWELD 7018', size: '4.0 x 450', opening: 0 },
+  { product: 'SPARKWELD 7018', size: '5.0 x 350', opening: 235 },
+  { product: 'SPARKWELD 7018', size: '5.0 x 450', opening: 135 },
+  { product: 'SPARKWELD 7018-1', size: '2.5 x 350', opening: 0 },
+  { product: 'SPARKWELD 7018-1', size: '3.2 x 350', opening: 0 },
+  { product: 'SPARKWELD 7018-1', size: '3.2 X 450', opening: 15 },
+  { product: 'SPARKWELD 7018-1', size: '4.0 X 350', opening: 265 },
+  { product: 'SPARKWELD 7018-1', size: '4.0 X 450', opening: 35 },
+  { product: 'SPARKWELD 7018-1', size: '5.0 X 350', opening: 0 },
+  { product: 'SPARKWELD 7018-1', size: '5.0 X 450', opening: 0 },
+  { product: 'VACUUM 7018', size: '2.5 X 350', opening: 0 },
+  { product: 'VACUUM 7018', size: '3.2 X 350', opening: 40 },
+  { product: 'VACUUM 7018', size: '4.0 X 350', opening: 154 },
+  { product: 'VACUUM 7018', size: '5.0 X 350', opening: 2 },
+  { product: 'VACUUM 7018-1', size: '2.5 X 350', opening: 532 },
+  { product: 'VACUUM 7018-1', size: '3.2 X 350', opening: 298 },
+  { product: 'VACUUM 7018-1', size: '4.0 X 350', opening: 8 },
+  { product: 'SPARKWELD Ni', size: '2.5 x 350', opening: 0 },
+  { product: 'SPARKWELD Ni', size: '3.2 x 350', opening: 268 },
+  { product: 'SPARKWELD Ni', size: '4.0 x 350', opening: 15 },
+  { product: 'SPARKWELD NiFe', size: '2.5 x 350', opening: 0 },
+  { product: 'SPARKWELD NiFe', size: '3.2 x 350', opening: 156 },
+  { product: 'SPARKWELD NiFe', size: '4.0 x 350', opening: 93 },
+  { product: 'VACUUM 8018-C3', size: '2.5 x 350', opening: 2 },
+  { product: 'VACUUM 8018-C3', size: '3.2 x 350', opening: 2834 },
+  { product: 'VACUUM 8018-C3', size: '4.0 x 350', opening: 534 },
+  { product: 'SPARKWELD 8018-C3', size: '2.5 x 350', opening: 0 },
+  { product: 'SPARKWELD 8018-C3', size: '3.2 x 350', opening: 0 },
+  { product: 'SPARKWELD 8018-C3', size: '4.0 x 350', opening: 0 },
+  { product: 'SPARKWELD 7024', size: '2.6 x 350', opening: 0 },
+  { product: 'SPARKWELD 7024', size: '3.2 x 350', opening: 156 },
+  { product: 'SPARKWELD 7024', size: '4.0 x 450', opening: 880 },
+  { product: 'SPARKWELD 7024', size: '5.0 x 350', opening: 0 },
+  { product: 'VACUUM 8018-B2', size: '2.5 x 350', opening: 0 },
+  { product: 'VACUUM 8018-B2', size: '3.2 x 350', opening: 318 },
+  { product: 'VACUUM 8018-B2', size: '4.0 x 350', opening: 106 },
+  { product: 'VACUUM 10018-M', size: '3.2 x 350', opening: 92 },
+  { product: 'VACUUM 10018-G', size: '3.2 x 350', opening: 0 },
+  { product: 'VACUUM 10018-D2', size: '4.0 x 350', opening: 30 },
+  { product: 'VACUUM 8018-G', size: '2.5 x 350', opening: 106 },
+  { product: 'VACUUM 8018-G', size: '3.2 x 350', opening: 86 },
+  { product: 'VACUUM 8018-G', size: '4.0 x 350', opening: 284 },
+];
 
 // Helper to convert Base64 to File for sharing
 const dataURLtoFile = (dataurl: string, filename: string): File => {
@@ -22,11 +77,16 @@ const dataURLtoFile = (dataurl: string, filename: string): File => {
 
 interface SalesDashboardProps {
   orders: SalesOrder[];
-  productionRecords: ProductionRecord[]; // Added for FIFO logic
+  productionRecords: ProductionRecord[];
   onEditOrder: (order: SalesOrder | null) => void;
   userRole: UserRole;
   onRefreshData: () => void;
   onManualRefresh: () => void;
+}
+
+interface PackabilityStatus {
+  status: 'Ready' | 'Partial' | 'Out of Stock';
+  missingItems: { product: string; size: string; missingKg: number }[];
 }
 
 export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, productionRecords, onEditOrder, userRole, onRefreshData, onManualRefresh }) => {
@@ -35,15 +95,85 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
   const [showDeliveryLedger, setShowDeliveryLedger] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState(false);
   const [showPasteHint, setShowPasteHint] = useState(false);
+  const [packFilter, setPackFilter] = useState<'all' | 'ready'>('all');
   
-  // Bulk selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  // Filter out delivered orders to reduce clutter? Or keep all. 
-  // Let's sort by date descending.
+  // --- INVENTORY SNAPSHOT CALCULATION ---
+  const inventorySnapshot = useMemo(() => {
+    const normalize = (str: string) => str.toLowerCase().replace(/\s/g, '');
+    const stockMap = new Map<string, number>();
+
+    // Start with Master Openings
+    MASTER_FG_OPENING.forEach(item => {
+      const key = `${normalize(item.product)}|${normalize(item.size)}`;
+      stockMap.set(key, item.opening);
+    });
+
+    // Add Production and Returns
+    productionRecords.forEach(r => {
+      if (r.isDispatch) return;
+      const key = `${normalize(r.productName)}|${normalize(r.size)}`;
+      const current = stockMap.get(key) || 0;
+      stockMap.set(key, current + r.weightKg);
+    });
+
+    // Subtract Dispatches (Manual and Order-based)
+    productionRecords.forEach(r => {
+      if (!r.isDispatch) return;
+      const key = `${normalize(r.productName)}|${normalize(r.size)}`;
+      const current = stockMap.get(key) || 0;
+      stockMap.set(key, current - r.weightKg);
+    });
+
+    orders.forEach(o => {
+      if (o.status === 'Dispatched' || o.status === 'Delivered') {
+        o.items.forEach(item => {
+          const key = `${normalize(item.productName)}|${normalize(item.size)}`;
+          const current = stockMap.get(key) || 0;
+          stockMap.set(key, current - item.calculatedWeightKg);
+        });
+      }
+    });
+
+    return stockMap;
+  }, [productionRecords, orders]);
+
+  // --- PACKABILITY ENGINE ---
+  const getPackability = (order: SalesOrder): PackabilityStatus => {
+    const normalize = (str: string) => str.toLowerCase().replace(/\s/g, '');
+    const missingItems: PackabilityStatus['missingItems'] = [];
+    let availableCount = 0;
+
+    order.items.forEach(item => {
+      const key = `${normalize(item.productName)}|${normalize(item.size)}`;
+      const available = inventorySnapshot.get(key) || 0;
+      
+      if (available >= item.calculatedWeightKg) {
+        availableCount++;
+      } else {
+        missingItems.push({
+          product: item.productName,
+          size: item.size,
+          missingKg: item.calculatedWeightKg - available
+        });
+      }
+    });
+
+    if (availableCount === order.items.length) return { status: 'Ready', missingItems: [] };
+    if (availableCount > 0) return { status: 'Partial', missingItems };
+    return { status: 'Out of Stock', missingItems };
+  };
+
   const sortedOrders = useMemo(() => {
-    return [...orders].sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime());
-  }, [orders]);
+    let list = [...orders].sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime());
+    
+    if (packFilter === 'ready' && userRole === 'admin') {
+      list = list.filter(o => o.status === 'Pending' && getPackability(o).status === 'Ready');
+    }
+    
+    return list;
+  }, [orders, inventorySnapshot, packFilter]);
 
   const toggleSelection = (id: string) => {
     const newSet = new Set(selectedIds);
@@ -65,17 +195,14 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
 
   const handleBulkStatusUpdate = (newStatus: SalesOrder['status']) => {
     if (selectedIds.size === 0) return;
-    
-    // Update all selected orders
     sortedOrders.forEach(order => {
       if (selectedIds.has(order.id)) {
         const updated = { ...order, status: newStatus };
         saveSalesOrder(updated);
       }
     });
-
-    onRefreshData(); // Trigger Sync Up
-    setSelectedIds(new Set()); // Clear selection
+    onRefreshData();
+    setSelectedIds(new Set());
     alert(`Updated ${selectedIds.size} orders to ${newStatus}`);
   };
   
@@ -84,21 +211,16 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
     if (window.confirm(`Are you sure you want to PERMANENTLY delete ${selectedIds.size} orders?`)) {
       deleteSalesOrders(Array.from(selectedIds));
       setSelectedIds(new Set());
-      onRefreshData(); // Trigger Sync Up
+      onRefreshData();
     }
   };
 
   const handleDelete = (id: string) => {
     if (window.confirm("Are you sure you want to PERMANENTLY delete this order?")) {
       deleteSalesOrder(id);
-      onRefreshData(); // Trigger Sync Up
+      onRefreshData();
       if (selectedOrder?.id === id) setSelectedOrder(null);
     }
-  };
-  
-  const handleSaveDeliveryUpdates = (updatedOrders: SalesOrder[]) => {
-    updatedOrders.forEach(order => saveSalesOrder(order));
-    onRefreshData(); // Trigger Sync Up
   };
 
   const generateShareText = (order: SalesOrder) => {
@@ -129,52 +251,34 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
     return text;
   };
 
-  const handleShareWhatsapp = async (order: SalesOrder) => {
-    const text = generateShareText(order);
+  // --- MISSING HANDLERS ADDED BELOW ---
 
-    // Try native share for file support (Web Share API)
-    if (order.poFileData && order.poFileName && navigator.share) {
-       try {
-         const file = dataURLtoFile(order.poFileData, order.poFileName);
-         const shareData = {
-           files: [file],
-           title: `Order ${order.poNumber}`,
-           text: text
-         };
-         
-         if (navigator.canShare && navigator.canShare(shareData)) {
-           // Auto-copy text as backup because WhatsApp often ignores text captions for files
-           try {
-             await navigator.clipboard.writeText(text);
-             setShowPasteHint(true);
-             setTimeout(() => setShowPasteHint(false), 8000);
-           } catch(e) {}
-           
-           await navigator.share(shareData);
-           return;
-         }
-       } catch (e) {
-         console.warn("File share failed, falling back to URL", e);
-       }
+  // Handler to view the PO file from base64 data
+  const handleViewPOFile = (order: SalesOrder) => {
+    if (!order.poFileData) return;
+    const win = window.open();
+    if (win) {
+      win.document.write(`<iframe src="${order.poFileData}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
     }
-
-    // Fallback to text link
-    const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
-    window.open(url, '_blank');
   };
 
-  const handleCopy = (order: SalesOrder) => {
+  // Handler to copy order summary to clipboard
+  const handleCopy = async (order: SalesOrder) => {
     const text = generateShareText(order);
-    navigator.clipboard.writeText(text);
-    setCopyFeedback(true);
-    setTimeout(() => setCopyFeedback(false), 2000);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopyFeedback(true);
+      setTimeout(() => setCopyFeedback(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy text: ', err);
+    }
   };
 
+  // Handler for native browser sharing
   const handleNativeShare = async (order: SalesOrder) => {
     const text = generateShareText(order);
-    
     const shareData: any = {
-      title: `Order ${order.poNumber}`,
+      title: 'Sales Order Details',
       text: text,
     };
 
@@ -183,14 +287,16 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
         const file = dataURLtoFile(order.poFileData, order.poFileName);
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
           shareData.files = [file];
-          // Auto copy text
+          // Backup copy text
           try {
-             await navigator.clipboard.writeText(text);
-             setShowPasteHint(true);
-             setTimeout(() => setShowPasteHint(false), 8000);
-          } catch(e) {}
+            await navigator.clipboard.writeText(text);
+            setShowPasteHint(true);
+            setTimeout(() => setShowPasteHint(false), 8000);
+          } catch (e) {}
         }
-      } catch(e) { console.warn("File prep failed", e); }
+      } catch (e) {
+        console.warn("File sharing preparation failed", e);
+      }
     }
 
     if (navigator.share) {
@@ -204,24 +310,42 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
     }
   };
 
-  const handleViewPOFile = (order: SalesOrder) => {
-    if (!order.poFileData) return;
+  // Handler to share order summary via WhatsApp
+  const handleShareWhatsapp = async (order: SalesOrder) => {
+    const text = generateShareText(order);
     
-    const win = window.open();
-    if (win) {
-      win.document.write(
-        `<iframe src="${order.poFileData}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`
-      );
-      win.document.title = `PO View - ${order.poNumber}`;
+    if (order.poFileData && order.poFileName && navigator.share) {
+       try {
+         const file = dataURLtoFile(order.poFileData, order.poFileName);
+         const shareData = {
+           files: [file],
+           title: 'Sales Order Details',
+           text: text
+         };
+         
+         if (navigator.canShare && navigator.canShare(shareData)) {
+            try {
+               await navigator.clipboard.writeText(text);
+               setShowPasteHint(true);
+               setTimeout(() => setShowPasteHint(false), 8000);
+            } catch(err) {}
+
+            await navigator.share(shareData);
+            return;
+         }
+       } catch (e) {
+         console.warn("File share failed, using URL fallback", e);
+       }
     }
+
+    const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank');
   };
 
-  // If PO Preview is active, render it overlaying everything
   if (showPOPreview && selectedOrder) {
     return <POPreview order={selectedOrder} onClose={() => setShowPOPreview(false)} />;
   }
 
-  // Delivery Ledger Modal
   if (showDeliveryLedger) {
     const selectedOrdersList = sortedOrders.filter(o => selectedIds.has(o.id));
     return (
@@ -229,7 +353,7 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
         orders={selectedOrdersList} 
         productionRecords={productionRecords}
         onClose={() => setShowDeliveryLedger(false)} 
-        onSaveUpdates={handleSaveDeliveryUpdates}
+        onSaveUpdates={(updated) => { updated.forEach(o => saveSalesOrder(o)); onRefreshData(); }}
       />
     );
   }
@@ -237,23 +361,32 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-           <p className="text-sm font-medium text-gray-500">Total Orders</p>
-           <h3 className="text-2xl font-bold text-gray-900">{orders.length}</h3>
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
+           <div className="p-3 bg-indigo-50 text-indigo-600 rounded-lg"><ShoppingBag size={24}/></div>
+           <div>
+              <p className="text-sm font-medium text-gray-500">Total Orders</p>
+              <h3 className="text-2xl font-bold text-gray-900">{orders.length}</h3>
+           </div>
         </div>
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-           <p className="text-sm font-medium text-gray-500">Pending</p>
-           <h3 className="text-2xl font-bold text-amber-500">{orders.filter(o => o.status === 'Pending').length}</h3>
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
+           <div className="p-3 bg-amber-50 text-amber-600 rounded-lg"><Clock size={24}/></div>
+           <div>
+              <p className="text-sm font-medium text-gray-500">Pending Pack</p>
+              <h3 className="text-2xl font-bold text-amber-500">{orders.filter(o => o.status === 'Pending').length}</h3>
+           </div>
         </div>
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-           <p className="text-sm font-medium text-gray-500">Volume Booked</p>
-           <h3 className="text-2xl font-bold text-indigo-600">
-             {orders.reduce((acc, o) => acc + o.totalWeightKg, 0).toLocaleString()} <span className="text-sm text-gray-400">Kg</span>
-           </h3>
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
+           <div className="p-3 bg-emerald-50 text-emerald-600 rounded-lg"><CheckCircle2 size={24}/></div>
+           <div>
+              <p className="text-sm font-medium text-gray-500">Ready to Load</p>
+              <h3 className="text-2xl font-bold text-emerald-600">
+                {orders.filter(o => o.status === 'Pending' && getPackability(o).status === 'Ready').length}
+              </h3>
+           </div>
         </div>
       </div>
 
-      {/* Bulk Action Bar (Visible when selections exist) */}
+      {/* Bulk Action Bar */}
       {selectedIds.size > 0 && userRole === 'admin' && (
         <div className="bg-indigo-900 text-white p-4 rounded-xl shadow-md flex flex-col md:flex-row gap-4 justify-between items-center animate-fadeIn">
           <div className="font-bold flex items-center gap-2">
@@ -280,12 +413,6 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
             >
               <Truck size={16} /> Dispatched
             </button>
-            <button 
-              onClick={() => handleBulkStatusUpdate('Delivered')}
-              className="px-4 py-2 bg-green-600 hover:bg-green-50 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-            >
-              <CheckCircle size={16} /> Delivered
-            </button>
             <div className="w-px bg-indigo-700 mx-2 hidden md:block"></div>
             <button 
               onClick={handleBulkDelete}
@@ -298,15 +425,31 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
       )}
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+        <div className="px-6 py-4 border-b border-gray-100 flex flex-col md:flex-row justify-between items-center bg-gray-50 gap-4">
           <h3 className="font-bold text-gray-700 flex items-center gap-2">
             <ShoppingBag size={18} /> Recent Orders
           </h3>
-          <div className="flex items-center gap-2">
-            {/* New Order Button for Admins (since they lack the FAB on mobile) */}
+          
+          <div className="flex items-center gap-2 w-full md:w-auto">
+            {userRole === 'admin' && (
+              <div className="flex bg-white border border-gray-200 rounded-lg p-1">
+                 <button 
+                  onClick={() => setPackFilter('all')}
+                  className={`px-3 py-1 text-xs font-bold rounded ${packFilter === 'all' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}
+                 >
+                   All
+                 </button>
+                 <button 
+                  onClick={() => setPackFilter('ready')}
+                  className={`px-3 py-1 text-xs font-bold rounded flex items-center gap-1 ${packFilter === 'ready' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}
+                 >
+                   <CheckCircle2 size={12}/> Ready
+                 </button>
+              </div>
+            )}
             <button 
               onClick={() => onEditOrder(null)}
-              className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-1 shadow-sm"
+              className="flex-1 md:flex-none px-3 py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700 transition-colors flex items-center justify-center gap-1 shadow-sm"
             >
               <Plus size={14} /> New Order
             </button>
@@ -336,15 +479,17 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
                 )}
                 <th className="px-6 py-3 font-medium">Date</th>
                 <th className="px-6 py-3 font-medium">Customer</th>
+                {userRole === 'admin' && <th className="px-6 py-3 font-medium text-center">Packing Hint</th>}
                 <th className="px-6 py-3 font-medium">PO Details</th>
-                <th className="px-6 py-3 font-medium">Items</th>
-                <th className="px-6 py-3 font-medium text-right">Total Weight</th>
+                <th className="px-6 py-3 font-medium text-right">Weight</th>
                 <th className="px-6 py-3 font-medium text-center">Status</th>
                 <th className="px-6 py-3 font-medium text-center">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {sortedOrders.map((order) => (
+              {sortedOrders.map((order) => {
+                const packability = userRole === 'admin' ? getPackability(order) : null;
+                return (
                 <tr key={order.id} className={`hover:bg-gray-50 ${selectedIds.has(order.id) ? 'bg-indigo-50/50' : ''}`}>
                   {userRole === 'admin' && (
                     <td className="px-4 py-4 text-center">
@@ -365,6 +510,45 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
                        <MapPin size={12} /> {order.city}
                     </div>
                   </td>
+                  
+                  {/* ADMIN PACKING HINT COLUMN */}
+                  {userRole === 'admin' && (
+                    <td className="px-6 py-4 text-center">
+                       {order.status === 'Pending' ? (
+                          <div className="group relative inline-block">
+                             <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-black uppercase tracking-tighter ${
+                               packability?.status === 'Ready' ? 'bg-emerald-100 text-emerald-700' :
+                               packability?.status === 'Partial' ? 'bg-amber-100 text-amber-700' :
+                               'bg-red-100 text-red-700'
+                             }`}>
+                               {packability?.status === 'Ready' && <CheckCircle2 size={12}/>}
+                               {packability?.status === 'Partial' && <Box size={12}/>}
+                               {packability?.status === 'Out of Stock' && <AlertCircle size={12}/>}
+                               {packability?.status}
+                             </span>
+                             
+                             {/* Hint Tooltip */}
+                             {packability?.missingItems && packability.missingItems.length > 0 && (
+                               <div className="absolute z-50 invisible group-hover:visible bg-gray-900 text-white text-[10px] p-2 rounded-lg shadow-xl w-48 -left-20 top-8 text-left">
+                                  <p className="font-bold border-b border-gray-700 pb-1 mb-1 text-red-400">Shortage List:</p>
+                                  {packability.missingItems.map((m, idx) => (
+                                    <div key={idx} className="flex justify-between py-0.5">
+                                      <span className="truncate pr-2">{m.product}</span>
+                                      <span className="font-mono text-red-300">{m.missingKg.toFixed(0)}kg</span>
+                                    </div>
+                                  ))}
+                                  <div className="mt-1 pt-1 border-t border-gray-700 italic text-gray-400">
+                                    Current FG stock is insufficient.
+                                  </div>
+                               </div>
+                             )}
+                          </div>
+                       ) : (
+                         <span className="text-gray-300 text-[10px]">—</span>
+                       )}
+                    </td>
+                  )}
+
                   <td className="px-6 py-4">
                      <div className="font-mono text-xs font-bold text-gray-600">{order.poNumber}</div>
                      {order.poFileName && (
@@ -373,21 +557,7 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
                        </div>
                      )}
                   </td>
-                  <td className="px-6 py-4">
-                    <div className="space-y-1">
-                      {order.items.slice(0, 2).map((item, idx) => (
-                        <div key={idx} className="text-xs text-gray-600">
-                          {item.quantityCtn} CTN x {item.productName} ({item.size})
-                        </div>
-                      ))}
-                      {order.items.length > 2 && (
-                        <div className="text-xs text-gray-400 italic">
-                          + {order.items.length - 2} more items
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-right font-bold text-indigo-600">
+                  <td className="px-6 py-4 text-right font-bold text-indigo-600 whitespace-nowrap">
                     {order.totalWeightKg.toLocaleString()} Kg
                   </td>
                   <td className="px-6 py-4 text-center">
@@ -405,8 +575,7 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
                     </span>
                   </td>
                   <td className="px-6 py-4 text-center">
-                    <div className="flex justify-center gap-2">
-                       {/* Edit Button - Admin Only (or if pending) */}
+                    <div className="flex justify-center gap-1">
                        {userRole === 'admin' && (
                          <>
                             <button 
@@ -435,7 +604,7 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
                     </div>
                   </td>
                 </tr>
-              ))}
+              )})}
               {orders.length === 0 && (
                 <tr>
                    <td colSpan={userRole === 'admin' ? 8 : 7} className="px-6 py-12 text-center text-gray-400">
@@ -501,22 +670,37 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
                        <th className="px-4 py-2 text-right">Size</th>
                        <th className="px-4 py-2 text-right">Cartons</th>
                        <th className="px-4 py-2 text-right">Weight (Kg)</th>
+                       {userRole === 'admin' && <th className="px-4 py-2 text-center">In Stock</th>}
                      </tr>
                    </thead>
                    <tbody className="divide-y divide-gray-100">
-                     {selectedOrder.items.map((item, idx) => (
+                     {selectedOrder.items.map((item, idx) => {
+                       const normalize = (str: string) => str.toLowerCase().replace(/\s/g, '');
+                       const key = `${normalize(item.productName)}|${normalize(item.size)}`;
+                       const available = inventorySnapshot.get(key) || 0;
+                       const isAvail = available >= item.calculatedWeightKg;
+
+                       return (
                        <tr key={idx}>
                          <td className="px-4 py-3 font-medium text-gray-800">{item.productName}</td>
                          <td className="px-4 py-3 text-right text-gray-500">{item.size}</td>
                          <td className="px-4 py-3 text-right text-gray-600">{item.quantityCtn}</td>
                          <td className="px-4 py-3 text-right font-bold text-indigo-600">{item.calculatedWeightKg}</td>
+                         {userRole === 'admin' && (
+                           <td className="px-4 py-3 text-center">
+                              <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold ${isAvail ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                {isAvail ? 'YES' : `NO (${available.toFixed(0)}kg)`}
+                              </span>
+                           </td>
+                         )}
                        </tr>
-                     ))}
+                     )})}
                    </tbody>
                    <tfoot className="bg-gray-50 font-bold">
                       <tr>
                         <td colSpan={3} className="px-4 py-3 text-right text-gray-600">Total:</td>
                         <td className="px-4 py-3 text-right text-indigo-700">{selectedOrder.totalWeightKg.toLocaleString()} Kg</td>
+                        {userRole === 'admin' && <td className="bg-gray-50"></td>}
                       </tr>
                    </tfoot>
                  </table>
