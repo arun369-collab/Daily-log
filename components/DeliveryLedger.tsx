@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { SalesOrder, ProductionRecord } from '../types';
 import { Printer, X, Check, ArrowRight, Layers, Truck, Calendar, Plus, Trash2 } from 'lucide-react';
@@ -92,8 +93,6 @@ export const DeliveryLedger: React.FC<DeliveryLedgerProps> = ({ orders, producti
 
   const handleDeleteItem = (orderIndex: number, itemIndex: number) => {
       const updated = [...localOrders];
-      // Prevent deleting if it's the only item for this product? 
-      // User might want to remove it entirely from delivery manifest, so allow delete.
       if (updated[orderIndex].items.length <= 1) {
           alert("Cannot remove the last item from an order. Cancel the delivery preparation instead.");
           return;
@@ -117,7 +116,6 @@ export const DeliveryLedger: React.FC<DeliveryLedgerProps> = ({ orders, producti
   if (viewMode === 'edit') {
     return (
       <div className="fixed inset-0 z-[60] bg-gray-100 flex flex-col overflow-hidden animate-fadeIn">
-        {/* Header */}
         <div className="bg-white px-6 py-4 shadow-sm border-b border-gray-200 flex justify-between items-center">
           <div>
             <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
@@ -141,10 +139,7 @@ export const DeliveryLedger: React.FC<DeliveryLedgerProps> = ({ orders, producti
           </div>
         </div>
 
-        {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 max-w-6xl mx-auto w-full space-y-6">
-          
-          {/* Summary Card */}
           <div className="bg-blue-900 text-white p-6 rounded-xl shadow-md flex justify-between items-center">
             <div>
               <p className="text-blue-200 text-sm font-medium uppercase tracking-wider">Total Load Summary</p>
@@ -158,12 +153,11 @@ export const DeliveryLedger: React.FC<DeliveryLedgerProps> = ({ orders, producti
             </div>
           </div>
 
-          {/* Orders List */}
           {localOrders.map((order, oIdx) => (
             <div key={order.id} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
               <div className="bg-gray-50 px-6 py-3 border-b border-gray-200 flex justify-between items-center">
                 <div>
-                   <span className="font-bold text-gray-800">{order.customerName}</span>
+                   <span className="font-bold text-gray-800">{oIdx + 1}. {order.customerName}</span>
                    <span className="text-sm text-gray-500 ml-2">({order.city})</span>
                 </div>
                 <div className="text-xs font-mono text-gray-500 bg-white border px-2 py-1 rounded">
@@ -185,7 +179,6 @@ export const DeliveryLedger: React.FC<DeliveryLedgerProps> = ({ orders, producti
                   <tbody className="divide-y divide-gray-100">
                     {order.items.map((item, iIdx) => {
                       const fifoOptions = getFifoBatches(item.productName, item.size);
-                      
                       return (
                         <tr key={item.productId || iIdx}>
                           <td className="px-4 py-3 font-medium text-gray-900">{item.productName}</td>
@@ -224,8 +217,6 @@ export const DeliveryLedger: React.FC<DeliveryLedgerProps> = ({ orders, producti
                                   </div>
                                 )}
                               </div>
-                              
-                              {/* Action Buttons: Split / Delete */}
                               <button 
                                 onClick={() => handleSplitItem(oIdx, iIdx)}
                                 className="p-2 text-green-600 hover:bg-green-50 rounded-lg border border-transparent hover:border-green-200 transition-colors"
@@ -233,7 +224,6 @@ export const DeliveryLedger: React.FC<DeliveryLedgerProps> = ({ orders, producti
                               >
                                 <Plus size={16} />
                               </button>
-                              
                               <button 
                                 onClick={() => handleDeleteItem(oIdx, iIdx)}
                                 className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
@@ -256,25 +246,20 @@ export const DeliveryLedger: React.FC<DeliveryLedgerProps> = ({ orders, producti
     );
   }
 
-  // PRINT MODE
   return (
     <div className="fixed inset-0 z-[70] bg-white overflow-auto">
-      {/* Print Toolbar */}
       <div className="print:hidden bg-gray-800 text-white px-6 py-4 flex justify-between items-center sticky top-0 shadow-md">
         <h2 className="font-bold">Delivery Ledger Preview</h2>
         <div className="flex gap-3">
           <button onClick={() => setViewMode('edit')} className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm">Back to Edit</button>
-          <button onClick={handlePrint} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-bold flex items-center gap-2">
+          <button onClick={handlePrint} className="px-4 py-2 bg-blue-600 hover:bg-blue-50 rounded-lg text-sm font-bold flex items-center gap-2">
             <Printer size={16} /> Print Ledger
           </button>
-          <button onClick={onClose} className="px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-sm"><X size={16}/></button>
+          <button onClick={onClose} className="px-4 py-2 bg-red-600 hover:bg-red-50 rounded-lg text-sm"><X size={16}/></button>
         </div>
       </div>
 
-      {/* Printable Sheet */}
       <div className="max-w-[210mm] mx-auto bg-white p-8 print:p-0 print:max-w-none min-h-screen">
-        
-        {/* Header */}
         <div className="border-b-2 border-black pb-4 mb-6">
           <div className="flex justify-between items-end">
             <div>
@@ -288,7 +273,6 @@ export const DeliveryLedger: React.FC<DeliveryLedgerProps> = ({ orders, producti
           </div>
         </div>
 
-        {/* Orders Table */}
         <table className="w-full border-collapse border border-black text-sm">
           <thead>
             <tr className="bg-gray-100 print:bg-gray-200">
@@ -301,11 +285,8 @@ export const DeliveryLedger: React.FC<DeliveryLedgerProps> = ({ orders, producti
             </tr>
           </thead>
           <tbody>
-            {localOrders.map((order) => {
-              // Recalculate Total Layers for this Order based on the *current* items (including splits)
+            {localOrders.map((order, oIdx) => {
               const orderTotalLayers = order.items.reduce((acc, item) => acc + (item.calculatedWeightKg / 1000), 0);
-              
-              // Group items by Product + Size to merge batches for cleaner print output
               const groupedItemsMap = new Map<string, {
                 productName: string;
                 size: string;
@@ -346,11 +327,10 @@ export const DeliveryLedger: React.FC<DeliveryLedgerProps> = ({ orders, producti
 
                    return (
                      <tr key={`${order.id}-grouped-${idx}`} className="break-inside-avoid">
-                       {/* Group Customer Columns */}
                        {isFirst && (
                          <>
                            <td className="border border-black px-2 py-2 align-top" rowSpan={displayItems.length}>
-                             <div className="font-bold text-black">{order.customerName}</div>
+                             <div className="font-bold text-black">{oIdx + 1}. {order.customerName}</div>
                              <div className="text-xs text-gray-600">{order.city}</div>
                              <div className="text-[10px] mt-1">PO: {order.poNumber}</div>
                            </td>
@@ -377,7 +357,6 @@ export const DeliveryLedger: React.FC<DeliveryLedgerProps> = ({ orders, producti
                      </tr>
                    );
                 })}
-                {/* Order Total Row */}
                 <tr className="bg-gray-50 print:bg-gray-100 font-bold">
                    <td colSpan={4} className="border border-black px-2 py-1 text-right text-xs uppercase">Order Total:</td>
                    <td className="border border-black px-2 py-1 text-right">{order.totalWeightKg.toLocaleString()}</td>
@@ -396,7 +375,6 @@ export const DeliveryLedger: React.FC<DeliveryLedgerProps> = ({ orders, producti
           </tfoot>
         </table>
 
-        {/* Footer */}
         <div className="mt-12 flex justify-between text-xs pt-4 border-t border-black">
           <div>
             <p className="mb-8">Prepared By:</p>
