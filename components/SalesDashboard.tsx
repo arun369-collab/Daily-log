@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { SalesOrder, UserRole, ProductionRecord } from '../types';
-import { ShoppingBag, MapPin, FileText, CheckCircle, Clock, Eye, X, MessageCircle, Copy, Share2, Printer, ExternalLink, Pencil, Truck, Package, RefreshCw, ClipboardList, Plus, Trash2, AlertCircle, CheckCircle2, Box } from 'lucide-react';
+import { ShoppingBag, MapPin, FileText, CheckCircle, Clock, Eye, X, MessageCircle, Copy, Share2, Printer, ExternalLink, Pencil, Truck, Package, RefreshCw, ClipboardList, Plus, Trash2, AlertCircle, CheckCircle2, Box, RotateCcw } from 'lucide-react';
 import { POPreview } from './POPreview';
 import { DeliveryLedger } from './DeliveryLedger';
 import { saveSalesOrder, deleteSalesOrder, deleteSalesOrders } from '../services/storageService';
@@ -401,6 +401,16 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
               <ClipboardList size={16} /> Prepare Delivery / Print Ledger
             </button>
             <div className="w-px bg-indigo-700 mx-2 hidden md:block"></div>
+            
+            {/* REVERSE STATUS OPTION */}
+            <button 
+              onClick={() => handleBulkStatusUpdate('Pending')}
+              className="px-4 py-2 bg-amber-600 hover:bg-amber-500 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+              title="Reverse back to Pending"
+            >
+              <RotateCcw size={16} /> Set Pending
+            </button>
+
             <button 
               onClick={() => handleBulkStatusUpdate('Processing')}
               className="px-4 py-2 bg-indigo-700 hover:bg-indigo-600 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
