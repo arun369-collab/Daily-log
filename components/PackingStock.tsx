@@ -2,7 +2,8 @@
 import React, { useState, useMemo } from 'react';
 import { ProductionRecord, PackingStockItem, StockTransaction } from '../types';
 import { getStockTransactions, saveStockTransaction, deleteStockTransaction } from '../services/storageService';
-import { Package, Plus, ArrowDown, Search, RefreshCw, Lock, AlertTriangle, Calendar, History, Trash2, X, Download, ChevronLeft, ChevronRight } from 'lucide-react';
+import { syncUp } from '../services/syncService';
+import { Package, Plus, ArrowDown, Search, RefreshCw, Lock, AlertTriangle, Calendar, History, Trash2, X, Download, ChevronLeft, ChevronRight, Cloud } from 'lucide-react';
 import { PRODUCT_CATALOG } from '../data/products';
 
 // Records ON or AFTER this date will be deducted from Opening Stock.
@@ -64,6 +65,7 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
   const [inwardDate, setInwardDate] = useState(new Date().toISOString().split('T')[0]);
   const [refreshKey, setRefreshKey] = useState(0); 
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   
   const [hoveredBreakdown, setHoveredBreakdown] = useState<{
     x: number;
@@ -75,7 +77,7 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
   
   const [transactions, setTransactions] = useState<StockTransaction[]>(getStockTransactions());
 
-  // FIXED MAPPING LOGIC FOR 6013
+  // Fixed mapping for material IDs
   const resolveMaterialIds = (record: ProductionRecord): { packetId: string | null, cartonId: string | null } => {
     const prodName = record.productName.toUpperCase();
     const size = record.size;
@@ -101,8 +103,6 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
     else {
         if (prodName.includes('6013')) {
            cartonId = 'PC1003';
-           // Fixed: Ensure 6013 always maps to PD1001 unless it's a specific instruction for something else
-           // We removed the threshold check that was causing drift into PD1005
            packetId = 'PD1001';
         }
         else if (prodName.includes('7018')) {
@@ -194,7 +194,7 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
     return { stockData: calculatedData };
   }, [records, transactions, selectedDate, refreshKey]);
 
-  const handleSaveInward = () => {
+  const handleSaveInward = async () => {
     if (!inwardModalItem || !inwardQty || !inwardDate) return;
     const txn: StockTransaction = {
       id: crypto.randomUUID(),
@@ -204,9 +204,16 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
       type: 'INWARD',
       notes: 'Manual Entry'
     };
-    setTransactions(saveStockTransaction(txn));
+    
+    const updated = saveStockTransaction(txn);
+    setTransactions(updated);
     setInwardModalItem(null);
     setInwardQty('');
+    
+    // Sync with cloud immediately
+    setSyncing(true);
+    await syncUp();
+    setSyncing(false);
   };
 
   const adjustDate = (days: number) => {
@@ -215,9 +222,15 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
     setSelectedDate(d.toISOString().split('T')[0]);
   };
 
-  const handleDeleteTransaction = (id: string) => {
+  const handleDeleteTransaction = async (id: string) => {
     if (window.confirm("Delete this inward entry?")) {
-        setTransactions(deleteStockTransaction(id));
+        const updated = deleteStockTransaction(id);
+        setTransactions(updated);
+        
+        // Sync with cloud immediately
+        setSyncing(true);
+        await syncUp();
+        setSyncing(false);
     }
   };
 
@@ -273,11 +286,14 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
              <History size={20} />
            </button>
            <button 
-             onClick={() => setRefreshKey(k => k + 1)}
+             onClick={() => {
+               setRefreshKey(k => k + 1);
+               setTransactions(getStockTransactions());
+             }}
              className="p-2 bg-gray-100 text-gray-700 hover:bg-amber-100 hover:text-amber-700 rounded-lg transition-colors shadow-sm"
              title="Refresh Calculations"
            >
-             <RefreshCw size={20} />
+             <RefreshCw size={20} className={syncing ? 'animate-spin' : ''} />
            </button>
            <button 
              onClick={handleExport}
@@ -289,8 +305,9 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
       </div>
 
       <div className="bg-white shadow-lg border border-gray-300 overflow-hidden">
-        <div className="bg-[#4472c4] text-white text-center py-2 font-bold text-lg border-b border-gray-400 uppercase tracking-wider">
+        <div className="bg-[#4472c4] text-white text-center py-2 font-bold text-lg border-b border-gray-400 uppercase tracking-wider flex justify-center items-center gap-3">
           Packing Material Daily Stock Report
+          {syncing && <Cloud className="animate-pulse text-blue-200" size={20} />}
         </div>
         
         <div className="bg-white border-b border-black flex justify-between items-center px-4 py-2">
