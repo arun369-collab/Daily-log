@@ -1,7 +1,7 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ProductionRecord, SalesOrder, StockTransaction, PackingStockItem } from '../types';
-import { ClipboardList, AlertTriangle, CheckCircle2, Factory, Package, ArrowRight, User, TrendingUp, Info } from 'lucide-react';
+import { ClipboardList, AlertTriangle, CheckCircle2, Factory, Package, ArrowRight, User, TrendingUp, Info, Printer, Eye, X, Calendar } from 'lucide-react';
 import { getStockTransactions } from '../services/storageService';
 
 // Master Data required for calculations
@@ -17,7 +17,6 @@ const MASTER_FG_OPENING = [
   { product: 'SPARKWELD 7018', size: '4.0 X 350', opening: 2220 },
   { product: 'SPARKWELD 7018', size: '5.0 x 350', opening: 235 },
   { product: 'SPARKWELD 7018', size: '5.0 x 450', opening: 135 },
-  // ... and others
 ];
 
 const MASTER_PACKING_LIST: PackingStockItem[] = [
@@ -39,6 +38,7 @@ interface ProductionPlanningProps {
 }
 
 export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records, orders }) => {
+  const [viewMode, setViewMode] = useState<'dashboard' | 'print'>('dashboard');
   const transactions = useMemo(() => getStockTransactions(), []);
 
   // 1. Calculate Real-time FG Stock
@@ -46,13 +46,11 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
     const normalize = (str: string) => str.toLowerCase().replace(/\s/g, '');
     const stockMap = new Map<string, number>();
 
-    // Initial Master Data
     MASTER_FG_OPENING.forEach(item => {
       const key = `${normalize(item.product)}|${normalize(item.size)}`;
       stockMap.set(key, item.opening);
     });
 
-    // Plus Production/Returns
     records.forEach(r => {
       const key = `${normalize(r.productName)}|${normalize(r.size)}`;
       const current = stockMap.get(key) || 0;
@@ -63,7 +61,6 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
       }
     });
 
-    // Minus Dispatched Orders
     orders.forEach(o => {
       if (o.status === 'Dispatched' || o.status === 'Delivered') {
         o.items.forEach(item => {
@@ -82,19 +79,16 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
     const stockMap = new Map<string, number>();
     MASTER_PACKING_LIST.forEach(item => stockMap.set(item.id, item.openingStock));
 
-    // Transactions
     transactions.forEach(txn => {
       const current = stockMap.get(txn.itemId) || 0;
       stockMap.set(txn.itemId, current + txn.qty);
     });
 
-    // Deduct from Production
     records.forEach(r => {
       if (r.isReturn || r.isDispatch) return;
       const prodName = r.productName.toUpperCase();
       const approxPktWeight = r.duplesPkt > 0 ? (r.weightKg / r.duplesPkt) : 0;
 
-      // Logic derived from PackingStock component
       if (prodName.includes('6013')) {
         stockMap.set('PD1001', (stockMap.get('PD1001') || 0) - r.duplesPkt);
         stockMap.set('PC1003', (stockMap.get('PC1003') || 0) - r.cartonCtn);
@@ -160,7 +154,6 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
       orderDetails.push({ order, isReady: orderReady, shortfallItems: orderShortfalls });
     });
 
-    // Material Check (PD/PC/PB) for the shortfalls
     const materialAlerts: { name: string, stock: number, unit: string }[] = [];
     MASTER_PACKING_LIST.forEach(m => {
        const stock = packingStock.get(m.id) || 0;
@@ -176,30 +169,186 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
     };
   }, [fgStock, packingStock, orders]);
 
+  const handlePrint = () => {
+    window.print();
+  };
+
+  if (viewMode === 'print') {
+    return (
+      <div className="fixed inset-0 z-[70] bg-white overflow-auto">
+        <div className="print:hidden bg-gray-800 text-white px-6 py-4 flex justify-between items-center sticky top-0 shadow-md">
+          <h2 className="font-bold flex items-center gap-2"><Printer size={18} /> Production Planning Report</h2>
+          <div className="flex gap-3">
+            <button onClick={() => setViewMode('dashboard')} className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm">Back to View</button>
+            <button onClick={handlePrint} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-bold flex items-center gap-2">
+              <Printer size={16} /> Print Report
+            </button>
+            <button onClick={() => setViewMode('dashboard')} className="px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-sm"><X size={16}/></button>
+          </div>
+        </div>
+
+        <div className="max-w-[210mm] mx-auto bg-white p-8 print:p-0 print:max-w-none min-h-screen text-black">
+          {/* Header */}
+          <div className="border-b-2 border-black pb-4 mb-6 flex justify-between items-end">
+            <div>
+              <h1 className="text-3xl font-black uppercase tracking-tighter">Production Planning Report</h1>
+              <p className="text-sm font-medium text-gray-600">Based on Active Sales Orders & Live Inventory</p>
+            </div>
+            <div className="text-right">
+              <p className="font-bold text-lg">Date: {new Date().toLocaleDateString()}</p>
+              <p className="text-xs text-gray-500 font-mono">APP_ENV: PRODUCTION_PLAN_V1</p>
+            </div>
+          </div>
+
+          {/* KPI Row */}
+          <div className="grid grid-cols-3 gap-4 mb-8">
+            <div className="border border-black p-4 text-center">
+              <p className="text-[10px] font-bold uppercase text-gray-500">Pending Orders</p>
+              <p className="text-2xl font-black">{analysis.orderDetails.length}</p>
+            </div>
+            <div className="border border-black p-4 text-center">
+              <p className="text-[10px] font-bold uppercase text-gray-500">Prod. Shortfall Items</p>
+              <p className="text-2xl font-black">{analysis.priorities.length}</p>
+            </div>
+            <div className="border border-black p-4 text-center">
+              <p className="text-[10px] font-bold uppercase text-gray-500">Critical Materials</p>
+              <p className="text-2xl font-black text-red-600">{analysis.materialAlerts.length}</p>
+            </div>
+          </div>
+
+          {/* Section 1: Priorities */}
+          <div className="mb-8">
+            <h3 className="bg-black text-white px-3 py-1 text-sm font-bold uppercase mb-3">Priority 01: Production Queue (FIFO Order Age)</h3>
+            <table className="w-full border-collapse border border-black text-xs">
+               <thead>
+                 <tr className="bg-gray-100">
+                    <th className="border border-black px-2 py-1 text-left">Rank</th>
+                    <th className="border border-black px-2 py-1 text-left">Product / Description</th>
+                    <th className="border border-black px-2 py-1 text-right">Required (Kg)</th>
+                    <th className="border border-black px-2 py-1 text-right">In Stock (Kg)</th>
+                    <th className="border border-black px-2 py-1 text-right bg-gray-200">Production Needed</th>
+                    <th className="border border-black px-2 py-1 text-center">First Order</th>
+                 </tr>
+               </thead>
+               <tbody>
+                  {analysis.priorities.map((p, idx) => (
+                    <tr key={idx}>
+                       <td className="border border-black px-2 py-1 font-bold">{idx + 1}</td>
+                       <td className="border border-black px-2 py-1">{p.productName} ({p.size})</td>
+                       <td className="border border-black px-2 py-1 text-right">{p.totalNeeded.toLocaleString()}</td>
+                       <td className="border border-black px-2 py-1 text-right">{p.available.toLocaleString()}</td>
+                       <td className="border border-black px-2 py-1 text-right font-black text-red-600">{p.shortfall.toLocaleString()} kg</td>
+                       <td className="border border-black px-2 py-1 text-center font-mono">{p.firstOrderDate}</td>
+                    </tr>
+                  ))}
+                  {analysis.priorities.length === 0 && (
+                    <tr><td colSpan={6} className="border border-black p-4 text-center italic text-gray-500">No shortfall detected. Stock sufficient for all orders.</td></tr>
+                  )}
+               </tbody>
+            </table>
+          </div>
+
+          {/* Section 2: Order Fulfillment */}
+          <div className="mb-8">
+            <h3 className="bg-black text-white px-3 py-1 text-sm font-bold uppercase mb-3">Priority 02: Sales Order Fulfillment Details</h3>
+            <div className="space-y-4">
+              {analysis.orderDetails.map(({ order, isReady, shortfallItems }, idx) => (
+                <div key={idx} className={`border border-black p-3 break-inside-avoid ${isReady ? 'bg-gray-50' : 'bg-white'}`}>
+                   <div className="flex justify-between items-start border-b border-black pb-1 mb-2">
+                      <div>
+                        <span className="font-black text-sm uppercase">{order.customerName}</span>
+                        <span className="ml-2 text-[10px] text-gray-600">PO: {order.poNumber} | {order.orderDate} | Rep: {order.salesPerson}</span>
+                      </div>
+                      <div className={`px-2 py-0.5 rounded text-[10px] font-bold border border-black ${isReady ? 'bg-black text-white' : 'text-black'}`}>
+                        {isReady ? 'READY TO DISPATCH' : 'SHORTAGE DETECTED'}
+                      </div>
+                   </div>
+                   {!isReady && (
+                     <div className="grid grid-cols-2 gap-2">
+                        {shortfallItems.map((item, iIdx) => (
+                           <div key={iIdx} className="flex justify-between text-[10px] font-mono border-b border-dotted border-gray-300">
+                             <span>{item.productName} ({item.size})</span>
+                             <span className="font-bold">Miss: {(item.calculatedWeightKg - item.available).toLocaleString()} kg</span>
+                           </div>
+                        ))}
+                     </div>
+                   )}
+                   {isReady && <p className="text-[10px] italic text-gray-500 font-mono">Full order items available in Finished Goods inventory.</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Section 3: Material Check */}
+          <div>
+            <h3 className="bg-black text-white px-3 py-1 text-sm font-bold uppercase mb-3">Priority 03: Material Shortage Analysis</h3>
+            <div className="grid grid-cols-2 gap-4">
+               {analysis.materialAlerts.map((alert, idx) => (
+                 <div key={idx} className="border border-black p-2 flex justify-between items-center font-mono text-[10px]">
+                    <span className="font-bold uppercase">{alert.name}</span>
+                    <span className="text-red-600 font-black">Stock: {alert.stock.toLocaleString()} {alert.unit}</span>
+                 </div>
+               ))}
+               {analysis.materialAlerts.length === 0 && (
+                 <div className="col-span-2 border border-black p-4 text-center italic text-[10px]">All essential packing materials are currently within safe operating thresholds.</div>
+               )}
+            </div>
+          </div>
+
+          {/* Footer Signature */}
+          <div className="mt-16 flex justify-between text-[10px] border-t-2 border-black pt-4">
+             <div className="w-48 text-center">
+                <p className="mb-8">Production Manager</p>
+                <div className="border-b border-black"></div>
+             </div>
+             <div className="w-48 text-center">
+                <p className="mb-8">Sales Coordinator</p>
+                <div className="border-b border-black"></div>
+             </div>
+             <div className="w-48 text-center">
+                <p className="mb-8">Managing Director</p>
+                <div className="border-b border-black"></div>
+             </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
-           <div className="p-3 bg-amber-50 text-amber-600 rounded-lg"><ClipboardList size={24}/></div>
-           <div>
-              <p className="text-sm font-medium text-gray-500">Pending Orders</p>
-              <h3 className="text-2xl font-bold text-gray-900">{analysis.orderDetails.length}</h3>
-           </div>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 flex-1 w-full">
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
+            <div className="p-3 bg-amber-50 text-amber-600 rounded-lg"><ClipboardList size={24}/></div>
+            <div>
+                <p className="text-sm font-medium text-gray-500">Pending Orders</p>
+                <h3 className="text-2xl font-bold text-gray-900">{analysis.orderDetails.length}</h3>
+            </div>
+          </div>
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
+            <div className="p-3 bg-indigo-50 text-indigo-600 rounded-lg"><Factory size={24}/></div>
+            <div>
+                <p className="text-sm font-medium text-gray-500">Products to Produce</p>
+                <h3 className="text-2xl font-bold text-indigo-600">{analysis.priorities.length}</h3>
+            </div>
+          </div>
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
+            <div className="p-3 bg-red-50 text-red-600 rounded-lg"><Package size={24}/></div>
+            <div>
+                <p className="text-sm font-medium text-gray-500">Packing Shortages</p>
+                <h3 className="text-2xl font-bold text-red-600">{analysis.materialAlerts.length}</h3>
+            </div>
+          </div>
         </div>
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
-           <div className="p-3 bg-indigo-50 text-indigo-600 rounded-lg"><Factory size={24}/></div>
-           <div>
-              <p className="text-sm font-medium text-gray-500">Products to Produce</p>
-              <h3 className="text-2xl font-bold text-indigo-600">{analysis.priorities.length}</h3>
-           </div>
-        </div>
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
-           <div className="p-3 bg-red-50 text-red-600 rounded-lg"><Package size={24}/></div>
-           <div>
-              <p className="text-sm font-medium text-gray-500">Packing Shortages</p>
-              <h3 className="text-2xl font-bold text-red-600">{analysis.materialAlerts.length}</h3>
-           </div>
-        </div>
+
+        <button 
+          onClick={() => setViewMode('print')}
+          className="w-full md:w-auto px-6 py-4 bg-gray-900 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-xl hover:bg-black transition-all group"
+        >
+          <Printer size={20} className="group-hover:scale-110 transition-transform" /> 
+          Planning Report
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
