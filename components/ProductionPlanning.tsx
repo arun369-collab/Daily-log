@@ -41,6 +41,14 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
   const [viewMode, setViewMode] = useState<'dashboard' | 'print'>('dashboard');
   const transactions = useMemo(() => getStockTransactions(), []);
 
+  // Date Formatter Helper: YYYY-MM-DD to DD-MM-YYYY
+  const formatDDMMYYYY = (dateStr: string) => {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return dateStr;
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  };
+
   // 1. Calculate Real-time FG Stock
   const fgStock = useMemo(() => {
     const normalize = (str: string) => str.toLowerCase().replace(/\s/g, '');
@@ -195,7 +203,7 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
               <p className="text-sm font-medium text-gray-600">Based on Active Sales Orders & Live Inventory</p>
             </div>
             <div className="text-right">
-              <p className="font-bold text-lg">Date: {new Date().toLocaleDateString()}</p>
+              <p className="font-bold text-lg">Date: {formatDDMMYYYY(new Date().toISOString().split('T')[0])}</p>
               <p className="text-xs text-gray-500 font-mono">APP_ENV: PRODUCTION_PLAN_V1</p>
             </div>
           </div>
@@ -238,7 +246,7 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
                        <td className="border border-black px-2 py-1 text-right">{p.totalNeeded.toLocaleString()}</td>
                        <td className="border border-black px-2 py-1 text-right">{p.available.toLocaleString()}</td>
                        <td className="border border-black px-2 py-1 text-right font-black text-red-600">{p.shortfall.toLocaleString()} kg</td>
-                       <td className="border border-black px-2 py-1 text-center font-mono">{p.firstOrderDate}</td>
+                       <td className="border border-black px-2 py-1 text-center font-mono">{formatDDMMYYYY(p.firstOrderDate)}</td>
                     </tr>
                   ))}
                   {analysis.priorities.length === 0 && (
@@ -257,23 +265,31 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
                    <div className="flex justify-between items-start border-b border-black pb-1 mb-2">
                       <div>
                         <span className="font-black text-sm uppercase">{order.customerName}</span>
-                        <span className="ml-2 text-[10px] text-gray-600">PO: {order.poNumber} | {order.orderDate} | Rep: {order.salesPerson}</span>
+                        <span className="ml-2 text-[10px] text-gray-600">PO: {order.poNumber} | {formatDDMMYYYY(order.orderDate)} | Rep: {order.salesPerson}</span>
                       </div>
                       <div className={`px-2 py-0.5 rounded text-[10px] font-bold border border-black ${isReady ? 'bg-black text-white' : 'text-black'}`}>
                         {isReady ? 'READY TO DISPATCH' : 'SHORTAGE DETECTED'}
                       </div>
                    </div>
-                   {!isReady && (
-                     <div className="grid grid-cols-2 gap-2">
-                        {shortfallItems.map((item, iIdx) => (
+                   
+                   <div className="grid grid-cols-2 gap-2">
+                      {isReady ? (
+                        order.items.map((item, iIdx) => (
+                          <div key={iIdx} className="flex justify-between text-[10px] font-mono border-b border-dotted border-gray-300">
+                             <span>{item.productName} ({item.size})</span>
+                             <span className="font-bold text-green-700">{item.calculatedWeightKg.toLocaleString()} kg (OK)</span>
+                          </div>
+                        ))
+                      ) : (
+                        shortfallItems.map((item, iIdx) => (
                            <div key={iIdx} className="flex justify-between text-[10px] font-mono border-b border-dotted border-gray-300">
                              <span>{item.productName} ({item.size})</span>
-                             <span className="font-bold">Miss: {(item.calculatedWeightKg - item.available).toLocaleString()} kg</span>
+                             <span className="font-bold text-red-600">Miss: {(item.calculatedWeightKg - item.available).toLocaleString()} kg</span>
                            </div>
-                        ))}
-                     </div>
-                   )}
-                   {isReady && <p className="text-[10px] italic text-gray-500 font-mono">Full order items available in Finished Goods inventory.</p>}
+                        ))
+                      )}
+                   </div>
+                   {isReady && <p className="text-[8px] mt-2 italic text-gray-400 font-mono">Stock successfully reserved for dispatch.</p>}
                 </div>
               ))}
             </div>
@@ -388,7 +404,7 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
                        </td>
                        <td className="px-6 py-4 text-center">
                           <div className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-1 rounded">
-                            {p.firstOrderDate.split('-').reverse().join('/')}
+                            {formatDDMMYYYY(p.firstOrderDate)}
                           </div>
                        </td>
                     </tr>
@@ -426,7 +442,7 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
                                 {isReady ? 'Ready' : 'Incomplete'}
                               </span>
                            </div>
-                           <p className="text-xs text-gray-500">Rep: {order.salesPerson} | PO: {order.poNumber} | {order.orderDate}</p>
+                           <p className="text-xs text-gray-500">Rep: {order.salesPerson} | PO: {order.poNumber} | {formatDDMMYYYY(order.orderDate)}</p>
                         </div>
                         <div className="text-right">
                            <div className="text-sm font-bold text-indigo-600">{order.totalWeightKg.toLocaleString()} Kg</div>
@@ -434,21 +450,29 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
                         </div>
                      </div>
                      
-                     {!isReady && (
-                        <div className="bg-red-50 p-3 rounded-lg border border-red-100 mt-2">
-                           <p className="text-[10px] font-bold text-red-600 uppercase mb-2 flex items-center gap-1">
-                              <AlertTriangle size={12} /> Shortfall Alert:
-                           </p>
-                           <div className="space-y-1">
-                              {shortfallItems.map((item, iIdx) => (
-                                <div key={iIdx} className="flex justify-between text-xs">
-                                   <span className="text-red-800">{item.productName} ({item.size})</span>
-                                   <span className="font-bold text-red-900">Missing {(item.calculatedWeightKg - item.available).toLocaleString()} Kg</span>
-                                </div>
-                              ))}
-                           </div>
+                     <div className={`p-3 rounded-lg border mt-2 ${isReady ? 'bg-green-100/30 border-green-200' : 'bg-red-50 border-red-100'}`}>
+                        <p className={`text-[10px] font-bold uppercase mb-2 flex items-center gap-1 ${isReady ? 'text-green-700' : 'text-red-600'}`}>
+                           {isReady ? <CheckCircle2 size={12} /> : <AlertTriangle size={12} />} 
+                           {isReady ? 'Order Inventory Status:' : 'Shortfall Alert:'}
+                        </p>
+                        <div className="space-y-1">
+                           {isReady ? (
+                             order.items.map((item, iIdx) => (
+                               <div key={iIdx} className="flex justify-between text-xs text-green-900">
+                                  <span>{item.productName} ({item.size})</span>
+                                  <span className="font-bold">{item.calculatedWeightKg.toLocaleString()} Kg</span>
+                               </div>
+                             ))
+                           ) : (
+                             shortfallItems.map((item, iIdx) => (
+                               <div key={iIdx} className="flex justify-between text-xs text-red-800">
+                                  <span>{item.productName} ({item.size})</span>
+                                  <span className="font-bold">Missing {(item.calculatedWeightKg - item.available).toLocaleString()} Kg</span>
+                               </div>
+                             ))
+                           )}
                         </div>
-                     )}
+                     </div>
                   </div>
                 ))}
              </div>
