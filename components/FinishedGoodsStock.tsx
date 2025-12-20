@@ -15,7 +15,7 @@ interface FGDetail {
   info?: string;
 }
 
-// Opening Balance as of Nov 30 (Master Start Point)
+// ... Master Data remains same ...
 const MASTER_FINISHED_GOODS = [
   { product: 'SPARKWELD 6013', size: '2.6 x 350', opening: 2214 },
   { product: 'SPARKWELD 6013', size: '3.2 x 350', opening: 4204 },
@@ -84,14 +84,20 @@ export const FinishedGoodsStock: React.FC<FinishedGoodsStockProps> = ({ records 
   // Helper to normalize strings for comparison
   const normalize = (str: string) => str.toLowerCase().replace(/\s/g, '');
 
+  const formatFriendlyDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const pts = dateStr.split('-');
+    if (pts.length !== 3) return dateStr;
+    const mos = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${pts[2]} ${mos[parseInt(pts[1]) - 1]} ${pts[0]}`;
+  };
+
   const tableData = useMemo(() => {
     return MASTER_FINISHED_GOODS.map(item => {
       const normName = normalize(item.product);
       const normSize = normalize(item.size);
 
       // --- CALCULATE OPENING BALANCE AS OF START OF SELECTED DATE ---
-      // This is: Master Opening (Nov 30) + All activity from Dec 1st until (selectedDate - 1)
-      
       const prevProduction = records
         .filter(r => normalize(r.productName) === normName && normalize(r.size) === normSize && !r.isReturn && !r.isDispatch && r.date < selectedDate)
         .reduce((sum, r) => sum + r.weightKg, 0);
@@ -115,39 +121,20 @@ export const FinishedGoodsStock: React.FC<FinishedGoodsStockProps> = ({ records 
       const openingBalance = item.opening + prevProduction + prevReturn - prevManualDispatch - prevOrderDispatch;
 
       // --- CALCULATE ACTIVITY FOR EXACT SELECTED DATE ---
-
-      // 1. Production
       const productionBreakdown: FGDetail[] = records
-        .filter(r => 
-          normalize(r.productName) === normName && 
-          normalize(r.size) === normSize && 
-          !r.isReturn && !r.isDispatch &&
-          r.date === selectedDate
-        )
+        .filter(r => normalize(r.productName) === normName && normalize(r.size) === normSize && !r.isReturn && !r.isDispatch && r.date === selectedDate)
         .map(r => ({ date: r.date, reference: r.batchNo, qty: r.weightKg }));
 
       const productionQty = productionBreakdown.reduce((sum, b) => sum + b.qty, 0);
 
-      // 2. Returns
       const returnBreakdown: FGDetail[] = records
-        .filter(r => 
-          normalize(r.productName) === normName && 
-          normalize(r.size) === normSize && 
-          r.isReturn &&
-          r.date === selectedDate
-        )
+        .filter(r => normalize(r.productName) === normName && normalize(r.size) === normSize && r.isReturn && r.date === selectedDate)
         .map(r => ({ date: r.date, reference: r.batchNo, qty: r.weightKg, info: r.notes }));
 
       const returnQty = returnBreakdown.reduce((sum, b) => sum + b.qty, 0);
 
-      // 3. Despatch
       const manualDispatchBreakdown: FGDetail[] = records
-        .filter(r => 
-          normalize(r.productName) === normName && 
-          normalize(r.size) === normSize && 
-          r.isDispatch &&
-          r.date === selectedDate
-        )
+        .filter(r => normalize(r.productName) === normName && normalize(r.size) === normSize && r.isDispatch && r.date === selectedDate)
         .map(r => ({ date: r.date, reference: r.batchNo, qty: r.weightKg, info: r.notes }));
 
       const orderDispatchBreakdown: FGDetail[] = [];
@@ -250,13 +237,11 @@ export const FinishedGoodsStock: React.FC<FinishedGoodsStockProps> = ({ records 
         </div>
       </div>
 
-      {/* Styled Excel Table Container */}
       <div className="bg-white shadow-lg border border-gray-300 overflow-hidden relative">
         <div className="bg-[#4472c4] text-white text-center py-2 font-bold text-lg border-b border-gray-400 uppercase tracking-wider">
           Finished Goods Daily Stock Report
         </div>
         
-        {/* Date Selector Row */}
         <div className="bg-white border-b border-black flex justify-between items-center px-4 py-2">
           <div className="flex items-center gap-2">
              <button onClick={() => adjustDate(-1)} className="p-1 hover:bg-gray-100 rounded text-gray-500 transition-colors">
@@ -276,7 +261,7 @@ export const FinishedGoodsStock: React.FC<FinishedGoodsStockProps> = ({ records 
              </button>
           </div>
           <div className="bg-yellow-300 border border-black px-4 py-1 font-black text-black text-xs uppercase tracking-tighter">
-             Report Date: {new Date(selectedDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+             Report Date: {formatFriendlyDate(selectedDate)}
           </div>
         </div>
 
@@ -305,53 +290,20 @@ export const FinishedGoodsStock: React.FC<FinishedGoodsStockProps> = ({ records 
                     <td className="border border-black px-3 py-1 text-right font-bold bg-[#e2efda] text-black">
                       {row.dynamicOpening.toLocaleString()}
                     </td>
-                    
-                    {/* Production Breakdown Trigger */}
-                    <td 
-                      onMouseEnter={(e) => {
-                        if (row.production <= 0) return;
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        setHoveredBreakdown({ x: rect.right, y: rect.top, data: row.productionBreakdown, title: `${row.product} (${row.size})`, type: 'PRODUCTION' });
-                      }}
-                      onMouseLeave={() => setHoveredBreakdown(null)}
-                      className={`border border-black px-3 py-1 text-right bg-[#e2efda] font-bold transition-colors ${row.production > 0 ? 'text-blue-700 cursor-help hover:bg-blue-50' : 'text-gray-400'}`}
-                    >
+                    <td className={`border border-black px-3 py-1 text-right bg-[#e2efda] font-bold transition-colors ${row.production > 0 ? 'text-blue-700 cursor-help hover:bg-blue-50' : 'text-gray-400'}`}>
                       {row.production > 0 ? `+${row.production.toLocaleString()}` : '-'}
                     </td>
-                    
-                    {/* Return Breakdown Trigger */}
-                    <td 
-                      onMouseEnter={(e) => {
-                        if (row.return <= 0) return;
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        setHoveredBreakdown({ x: rect.right, y: rect.top, data: row.returnBreakdown, title: `${row.product} (${row.size})`, type: 'RETURN' });
-                      }}
-                      onMouseLeave={() => setHoveredBreakdown(null)}
-                      className={`border border-black px-3 py-1 text-right bg-[#e2efda] font-bold transition-colors ${row.return > 0 ? 'text-orange-600 cursor-help hover:bg-orange-50' : 'text-gray-400'}`}
-                    >
+                    <td className={`border border-black px-3 py-1 text-right bg-[#e2efda] font-bold transition-colors ${row.return > 0 ? 'text-orange-600 cursor-help hover:bg-orange-50' : 'text-gray-400'}`}>
                       {row.return > 0 ? `+${row.return.toLocaleString()}` : '-'}
                     </td>
-                    
-                    {/* Despatch Breakdown Trigger */}
-                    <td 
-                      onMouseEnter={(e) => {
-                        if (row.despatch <= 0) return;
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        setHoveredBreakdown({ x: rect.right, y: rect.top, data: row.despatchBreakdown, title: `${row.product} (${row.size})`, type: 'DESPATCH' });
-                      }}
-                      onMouseLeave={() => setHoveredBreakdown(null)}
-                      className={`border border-black px-3 py-1 text-right bg-[#e2efda] font-bold transition-colors ${row.despatch > 0 ? 'text-red-700 cursor-help hover:bg-red-50' : 'text-gray-400'}`}
-                    >
+                    <td className={`border border-black px-3 py-1 text-right bg-[#e2efda] font-bold transition-colors ${row.despatch > 0 ? 'text-red-700 cursor-help hover:bg-red-50' : 'text-gray-400'}`}>
                       {row.despatch > 0 ? `-${row.despatch.toLocaleString()}` : '-'}
                     </td>
-                    
                     <td className="border border-black px-3 py-1 text-right font-bold bg-[#e2efda] text-black">
                        {row.currentStock.toLocaleString()}
                     </td>
                  </tr>
                ))}
-               
-               {/* Grand Total Row */}
                <tr className="bg-yellow-100 font-bold border-t-2 border-black text-black">
                   <td className="border border-black px-3 py-2 text-right" colSpan={2}>Grand Total Activity:</td>
                   <td className="border border-black px-3 py-2 text-right">{totalOpening.toLocaleString()}</td>
@@ -364,54 +316,6 @@ export const FinishedGoodsStock: React.FC<FinishedGoodsStockProps> = ({ records 
           </table>
         </div>
       </div>
-
-      {/* Floating Breakdown Pop-up */}
-      {hoveredBreakdown && (
-        <div 
-          className="fixed z-50 bg-white shadow-2xl border border-black rounded-sm p-0 w-80 text-xs pointer-events-none overflow-hidden animate-fadeIn"
-          style={{ 
-            left: Math.max(10, hoveredBreakdown.x - 320), 
-            top: hoveredBreakdown.y > window.innerHeight / 2 ? 'auto' : hoveredBreakdown.y - 10,
-            bottom: hoveredBreakdown.y > window.innerHeight / 2 ? window.innerHeight - hoveredBreakdown.y - 10 : 'auto'
-          }}
-        >
-          <div className={`${
-            hoveredBreakdown.type === 'PRODUCTION' ? 'bg-blue-700' : 
-            hoveredBreakdown.type === 'RETURN' ? 'bg-orange-700' : 'bg-red-700'
-          } text-white px-3 py-1.5 font-bold flex justify-between`}>
-             <span className="truncate w-48">{hoveredBreakdown.title}</span>
-             <span>{hoveredBreakdown.type} ON {selectedDate}</span>
-          </div>
-          <div className="max-h-60 overflow-y-auto">
-             <table className="w-full">
-                <thead className="bg-gray-100 text-gray-800 border-b border-black">
-                   <tr>
-                      <th className="px-2 py-1 text-left font-bold">Ref / Batch</th>
-                      <th className="px-2 py-1 text-right font-bold">Weight</th>
-                   </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                   {hoveredBreakdown.data
-                     .map((entry, idx) => (
-                      <tr key={idx} className="hover:bg-yellow-50">
-                         <td className="px-2 py-1 font-mono text-gray-600 truncate">
-                           <div className="font-bold text-gray-900">{entry.reference}</div>
-                           {entry.info && <div className="text-[9px] text-blue-500 font-bold uppercase truncate">{entry.info}</div>}
-                         </td>
-                         <td className={`px-2 py-1 text-right font-bold ${
-                           hoveredBreakdown.type === 'PRODUCTION' ? 'text-blue-700' : 
-                           hoveredBreakdown.type === 'RETURN' ? 'text-orange-700' : 'text-red-700'
-                         }`}>{entry.qty.toLocaleString()}</td>
-                      </tr>
-                   ))}
-                </tbody>
-             </table>
-          </div>
-          <div className="bg-gray-50 px-3 py-1 border-t border-black text-right font-bold text-black uppercase tracking-tighter">
-             Total for Day: {hoveredBreakdown.data.reduce((acc, curr) => acc + curr.qty, 0).toLocaleString()} Kg
-          </div>
-        </div>
-      )}
     </div>
   );
 };

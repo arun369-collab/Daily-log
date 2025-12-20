@@ -14,10 +14,18 @@ export const POPreview: React.FC<POPreviewProps> = ({ order, onClose, isDialog =
     window.print();
   };
 
+  const formatFriendlyDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return dateStr;
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${parts[2]} ${months[parseInt(parts[1]) - 1]} ${parts[0]}`;
+  };
+
   // If used inside a dialog, we might want different button handling
   const ButtonClass = isDialog 
     ? "w-full py-3 bg-gray-800 hover:bg-black text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg transition-all mt-2"
-    : "flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg font-medium transition-colors";
+    : "flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-50 rounded-lg font-medium transition-colors";
 
   if (isDialog) {
      return (
@@ -43,7 +51,7 @@ export const POPreview: React.FC<POPreviewProps> = ({ order, onClose, isDialog =
         <div className="flex gap-3">
           <button 
             onClick={handlePrint}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg font-medium transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-50 rounded-lg font-medium transition-colors"
           >
             <Printer size={18} /> Print Document
           </button>
@@ -73,7 +81,7 @@ export const POPreview: React.FC<POPreviewProps> = ({ order, onClose, isDialog =
           <div className="text-right">
             <h2 className="text-2xl font-bold text-gray-400 uppercase">Proforma Invoice</h2>
             <p className="text-gray-800 font-mono font-bold text-lg mt-2">#{order.poNumber || order.id.slice(0, 8).toUpperCase()}</p>
-            <p className="text-gray-500 text-sm">Order Date: {order.orderDate}</p>
+            <p className="text-gray-500 text-sm">Order Date: {formatFriendlyDate(order.orderDate)}</p>
           </div>
         </div>
 
@@ -90,7 +98,7 @@ export const POPreview: React.FC<POPreviewProps> = ({ order, onClose, isDialog =
              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Order Details</h3>
              <p className="text-gray-600"><span className="font-medium text-gray-800">Sales Rep:</span> {order.salesPerson}</p>
              <p className="text-gray-600"><span className="font-medium text-gray-800">PO Ref:</span> {order.poNumber}</p>
-             <p className="text-gray-600"><span className="font-medium text-gray-800">PO Date:</span> {order.poDate}</p>
+             <p className="text-gray-600"><span className="font-medium text-gray-800">PO Date:</span> {formatFriendlyDate(order.poDate)}</p>
              <p className="text-gray-600"><span className="font-medium text-gray-800">Status:</span> {order.status}</p>
           </div>
         </div>

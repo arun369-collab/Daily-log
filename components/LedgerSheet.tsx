@@ -34,12 +34,13 @@ export const LedgerSheet: React.FC<LedgerSheetProps> = ({ records }) => {
   const [customStart, setCustomStart] = useState(new Date().toISOString().split('T')[0]);
   const [customEnd, setCustomEnd] = useState(new Date().toISOString().split('T')[0]);
 
-  // Helper to format date for display: YYYY-MM-DD -> DD-MM-YYYY
+  // Helper to format date for display: YYYY-MM-DD -> DD MMM YYYY
   const formatDisplayDate = (dateStr: string) => {
     if (!dateStr) return '';
     const parts = dateStr.split('-');
     if (parts.length !== 3) return dateStr;
-    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${parts[2]} ${months[parseInt(parts[1]) - 1]} ${parts[0]}`;
   };
 
   // Helper: Get Date Range from Week String (YYYY-Www)

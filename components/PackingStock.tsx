@@ -222,6 +222,14 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
     setSelectedDate(d.toISOString().split('T')[0]);
   };
 
+  const formatFriendlyDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const pts = dateStr.split('-');
+    if (pts.length !== 3) return dateStr;
+    const mos = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${pts[2]} ${mos[parseInt(pts[1]) - 1]} ${pts[0]}`;
+  };
+
   const handleDeleteTransaction = async (id: string) => {
     if (window.confirm("Delete this inward entry?")) {
         const updated = deleteStockTransaction(id);
@@ -329,7 +337,7 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
              </button>
           </div>
           <div className="bg-yellow-300 border border-black px-4 py-1 font-black text-black text-xs uppercase tracking-tighter">
-             Report Date: {new Date(selectedDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+             Report Date: {formatFriendlyDate(selectedDate)}
           </div>
         </div>
 
@@ -414,150 +422,6 @@ export const PackingStock: React.FC<PackingStockProps> = ({ records }) => {
           </table>
         </div>
       </div>
-
-      {hoveredBreakdown && (
-        <div 
-          className="fixed z-50 bg-white shadow-2xl border border-black rounded-sm p-0 w-80 text-xs pointer-events-none overflow-hidden animate-fadeIn"
-          style={{ 
-            left: Math.max(10, hoveredBreakdown.x - 320), 
-            top: hoveredBreakdown.y > window.innerHeight / 2 ? 'auto' : hoveredBreakdown.y - 10,
-            bottom: hoveredBreakdown.y > window.innerHeight / 2 ? window.innerHeight - hoveredBreakdown.y - 10 : 'auto'
-          }}
-        >
-          <div className={`${hoveredBreakdown.type === 'INWARD' ? 'bg-green-700' : 'bg-red-700'} text-white px-3 py-1.5 font-bold flex justify-between`}>
-             <span className="truncate w-48">{hoveredBreakdown.itemName}</span>
-             <span>{hoveredBreakdown.type} ON {selectedDate}</span>
-          </div>
-          <div className="max-h-60 overflow-y-auto">
-             <table className="w-full">
-                <thead className="bg-gray-100 text-gray-800 border-b border-black">
-                   <tr>
-                      <th className="px-2 py-1 text-left font-bold">Reference</th>
-                      <th className="px-2 py-1 text-right font-bold">Qty</th>
-                   </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                   {hoveredBreakdown.data
-                     .map((entry, idx) => (
-                      <tr key={idx} className="hover:bg-yellow-50">
-                         <td className="px-2 py-1 font-mono text-gray-600 truncate">{entry.batch}</td>
-                         <td className={`px-2 py-1 text-right font-bold ${hoveredBreakdown.type === 'INWARD' ? 'text-green-700' : 'text-red-700'}`}>{entry.qty.toLocaleString()}</td>
-                      </tr>
-                   ))}
-                </tbody>
-             </table>
-          </div>
-          <div className="bg-gray-50 px-3 py-1 border-t border-black text-right font-bold text-black uppercase tracking-tighter">
-             Daily {hoveredBreakdown.type}: {hoveredBreakdown.data.reduce((acc, curr) => acc + curr.qty, 0).toLocaleString()}
-          </div>
-        </div>
-      )}
-
-      {showHistoryModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[80vh] border border-black">
-            <div className="bg-gray-800 px-6 py-4 flex justify-between items-center text-white">
-              <h3 className="text-lg font-bold flex items-center gap-2">
-                <History size={20} /> Inward Transaction History
-              </h3>
-              <button onClick={() => setShowHistoryModal(false)} className="text-gray-400 hover:text-white transition-colors">
-                <X size={20} />
-              </button>
-            </div>
-            
-            <div className="p-0 overflow-y-auto flex-1">
-               <table className="w-full text-sm text-left border-collapse">
-                 <thead className="bg-[#70ad47] text-black sticky top-0 border-b-2 border-black">
-                   <tr>
-                     <th className="px-6 py-3 font-bold">Date</th>
-                     <th className="px-6 py-3 font-bold">Item Description</th>
-                     <th className="px-6 py-3 font-bold text-right">Qty Added</th>
-                     <th className="px-6 py-3 font-bold text-center">Action</th>
-                   </tr>
-                 </thead>
-                 <tbody className="divide-y divide-gray-300">
-                   {transactions.map(txn => {
-                     const item = MASTER_STOCK_LIST.find(i => i.id === txn.itemId);
-                     return (
-                       <tr key={txn.id} className="hover:bg-[#e2efda]/50">
-                         <td className="px-6 py-3 font-bold text-gray-800 whitespace-nowrap border-r border-gray-200">{txn.date}</td>
-                         <td className="px-6 py-3 border-r border-gray-200">
-                           <div className="font-bold text-gray-900">{item?.name || txn.itemId}</div>
-                           <div className="text-[10px] text-gray-500 uppercase tracking-tighter">Reference: {txn.notes}</div>
-                         </td>
-                         <td className="px-6 py-3 text-right font-mono font-bold text-green-700 bg-green-50/20 border-r border-gray-200">
-                           +{txn.qty.toLocaleString()}
-                         </td>
-                         <td className="px-6 py-3 text-center">
-                           <button 
-                             onClick={() => handleDeleteTransaction(txn.id)}
-                             className="p-2 text-red-400 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors border border-transparent hover:border-red-200 shadow-sm"
-                             title="Delete Inward"
-                           >
-                             <Trash2 size={16} />
-                           </button>
-                         </td>
-                       </tr>
-                     );
-                   })}
-                 </tbody>
-               </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {inwardModalItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded shadow-2xl w-full max-w-sm overflow-hidden animate-fadeIn border-2 border-black">
-            <div className="bg-[#4472c4] px-6 py-4 border-b border-black">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <ArrowDown size={20} /> STOCK INWARD
-              </h3>
-              <p className="text-blue-100 text-[10px] font-bold uppercase truncate mt-1">{inwardModalItem.name}</p>
-            </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Receipt Date</label>
-                <div className="relative">
-                   <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
-                   <input 
-                     type="date" 
-                     value={inwardDate}
-                     onChange={(e) => setInwardDate(e.target.value)}
-                     className="w-full pl-9 pr-4 py-2 border border-black rounded focus:ring-1 focus:ring-blue-500 outline-none font-bold text-sm"
-                   />
-                </div>
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Quantity to Add ({inwardModalItem.unit})</label>
-                <input 
-                  type="number" 
-                  autoFocus
-                  value={inwardQty}
-                  onChange={(e) => setInwardQty(e.target.value)}
-                  className="w-full px-4 py-3 border-2 border-black rounded focus:ring-0 outline-none text-2xl font-bold text-center"
-                  placeholder="0"
-                />
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button 
-                  onClick={() => setInwardModalItem(null)}
-                  className="flex-1 py-3 text-gray-600 hover:bg-gray-100 border border-gray-300 rounded font-bold text-sm"
-                >
-                  CANCEL
-                </button>
-                <button 
-                  onClick={handleSaveInward}
-                  className="flex-1 py-3 bg-[#70ad47] text-black border border-black rounded font-black text-sm hover:bg-[#5a8a3a] shadow-lg"
-                >
-                  SAVE INWARD
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

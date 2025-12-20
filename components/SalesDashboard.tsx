@@ -102,14 +102,23 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
   };
 
   const generateShareText = (order: SalesOrder) => {
+    const fmt = (d: string) => {
+      if (!d) return 'N/A';
+      const pts = d.split('-');
+      if (pts.length !== 3) return d;
+      const mos = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return `${pts[2]} ${mos[parseInt(pts[1]) - 1]} ${pts[0]}`;
+    };
+
     let text = `*Sales Order Details* 📦\n`;
     text += `Customer: ${order.customerName}\n`;
+    text += `Order Date: ${fmt(order.orderDate)}\n`;
     text += `Mobile: ${order.mobileNumber}\n`;
     text += `Sales Person: ${order.salesPerson}\n`;
     text += `City: ${order.city}\n`;
     if(order.mapLink) text += `📍 ${order.mapLink}\n`;
     text += `PO No: ${order.poNumber}\n`;
-    text += `PO Date: ${order.poDate}\n`; // Added PO Date
+    text += `PO Date: ${fmt(order.poDate)}\n`;
     if(order.poFileName) text += `PO File: ${order.poFileName} (See Attachment)\n`;
     
     text += `\n*Items:* \n`;
@@ -348,7 +357,9 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
                       />
                     </td>
                   )}
-                  <td className="px-6 py-4 text-gray-600 whitespace-nowrap">{order.orderDate}</td>
+                  <td className="px-6 py-4 text-gray-600 whitespace-nowrap">
+                    {order.orderDate.split('-').reverse().join('-')}
+                  </td>
                   <td className="px-6 py-4">
                     <div className="font-bold text-gray-900">{order.customerName}</div>
                     <div className="text-xs text-gray-500 flex items-center gap-1 mt-1">
@@ -473,7 +484,7 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
                  </div>
                  <div className="text-right">
                     <h4 className="text-xs font-bold text-gray-400 uppercase mb-2">Order Info</h4>
-                    <p className="text-sm text-gray-600">Date: {selectedOrder.orderDate}</p>
+                    <p className="text-sm text-gray-600">Date: {selectedOrder.orderDate.split('-').reverse().join('-')}</p>
                     <p className="text-sm text-gray-600">Rep: {selectedOrder.salesPerson}</p>
                     <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium mt-2 ${
                       selectedOrder.status === 'Pending' ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'

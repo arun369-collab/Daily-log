@@ -262,14 +262,23 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
 
   // --- WHATSAPP TEXT GENERATION (NO PRICE) ---
   const generateShareText = (order: SalesOrder) => {
+    const fmt = (d: string) => {
+      if (!d) return 'N/A';
+      const pts = d.split('-');
+      if (pts.length !== 3) return d;
+      const mos = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return `${pts[2]} ${mos[parseInt(pts[1]) - 1]} ${pts[0]}`;
+    };
+
     let text = `*Sales Order Details* 📦\n`;
     text += `Customer: ${order.customerName}\n`;
+    text += `Order Date: ${fmt(order.orderDate)}\n`;
     text += `Mobile: ${order.mobileNumber}\n`;
     text += `Sales Person: ${order.salesPerson}\n`;
     text += `City: ${order.city}\n`;
     if(order.mapLink) text += `📍 ${order.mapLink}\n`;
     text += `PO No: ${order.poNumber}\n`;
-    text += `PO Date: ${order.poDate}\n`; // Added PO Date
+    text += `PO Date: ${fmt(order.poDate)}\n`;
     if(order.poFileName) text += `PO File: ${order.poFileName} (See Attachment)\n`;
     
     text += `\n*Items:* \n`;
