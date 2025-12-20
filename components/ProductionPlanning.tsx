@@ -273,18 +273,24 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
                       </div>
                    </div>
                    
-                   <div className="grid grid-cols-2 gap-2">
+                   <div className="space-y-0.5">
                       {isReady ? (
                         order.items.map((item, iIdx) => (
-                          <div key={iIdx} className="flex justify-between text-[10px] font-mono border-b border-dotted border-gray-300 text-black">
-                             <span>{item.productName} ({item.size})</span>
+                          <div key={iIdx} className="flex justify-between text-[10px] font-mono border-b border-dotted border-gray-300 text-black py-0.5">
+                             <span className="flex items-center gap-1.5">
+                                <span className="w-3 h-3 rounded-full border border-black flex items-center justify-center text-[7px] font-bold">{iIdx + 1}</span>
+                                {item.productName} ({item.size})
+                             </span>
                              <span className="font-bold text-green-700">{item.calculatedWeightKg.toLocaleString()} kg (OK)</span>
                           </div>
                         ))
                       ) : (
                         shortfallItems.map((item, iIdx) => (
-                           <div key={iIdx} className="flex justify-between text-[10px] font-mono border-b border-dotted border-gray-300 text-black">
-                             <span>{item.productName} ({item.size})</span>
+                           <div key={iIdx} className="flex justify-between text-[10px] font-mono border-b border-dotted border-gray-300 text-black py-0.5">
+                             <span className="flex items-center gap-1.5">
+                                <span className="w-3 h-3 rounded-full border border-black flex items-center justify-center text-[7px] font-bold">{iIdx + 1}</span>
+                                {item.productName} ({item.size})
+                             </span>
                              <span className="font-bold text-red-600">Miss: {(item.calculatedWeightKg - item.available).toLocaleString()} kg</span>
                            </div>
                         ))
@@ -459,15 +465,21 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
                         <div className="space-y-1">
                            {isReady ? (
                              order.items.map((item, iIdx) => (
-                               <div key={iIdx} className="flex justify-between text-xs text-green-900">
-                                  <span>{item.productName} ({item.size})</span>
+                               <div key={iIdx} className="flex justify-between text-xs text-green-900 border-b border-green-100 last:border-0 py-1">
+                                  <span className="flex items-center gap-1.5">
+                                    <span className="w-4 h-4 rounded-full border border-green-300 flex items-center justify-center text-[8px] font-bold">{iIdx + 1}</span>
+                                    {item.productName} ({item.size})
+                                  </span>
                                   <span className="font-bold">{item.calculatedWeightKg.toLocaleString()} Kg</span>
                                </div>
                              ))
                            ) : (
                              shortfallItems.map((item, iIdx) => (
-                               <div key={iIdx} className="flex justify-between text-xs text-red-800">
-                                  <span>{item.productName} ({item.size})</span>
+                               <div key={iIdx} className="flex justify-between text-xs text-red-800 border-b border-red-100 last:border-0 py-1">
+                                  <span className="flex items-center gap-1.5">
+                                    <span className="w-4 h-4 rounded-full border border-red-300 flex items-center justify-center text-[8px] font-bold">{iIdx + 1}</span>
+                                    {item.productName} ({item.size})
+                                  </span>
                                   <span className="font-bold">Missing {(item.calculatedWeightKg - item.available).toLocaleString()} Kg</span>
                                </div>
                              ))
