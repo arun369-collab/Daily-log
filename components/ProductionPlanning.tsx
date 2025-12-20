@@ -184,7 +184,7 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
 
   if (viewMode === 'print') {
     return (
-      <div className="fixed inset-0 z-[70] bg-white overflow-auto">
+      <div className="fixed inset-0 z-[70] bg-white overflow-auto print:static print:inset-auto print:z-0 print:overflow-visible print:bg-white">
         <div className="print:hidden bg-gray-800 text-white px-6 py-4 flex justify-between items-center sticky top-0 shadow-md">
           <h2 className="font-bold flex items-center gap-2"><Printer size={18} /> Production Planning Report</h2>
           <div className="flex gap-3">
@@ -196,7 +196,7 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
           </div>
         </div>
 
-        <div className="max-w-[210mm] mx-auto bg-white p-8 print:p-0 print:max-w-none min-h-screen text-black">
+        <div className="max-w-[210mm] mx-auto bg-white p-8 print:p-0 print:m-0 print:max-w-none min-h-screen print:min-h-0 text-black">
           {/* Header */}
           <div className="border-b-2 border-black pb-4 mb-6 flex justify-between items-end">
             <div>
@@ -226,7 +226,7 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
           </div>
 
           {/* Section 1: Priorities */}
-          <div className="mb-8">
+          <div className="mb-8 break-inside-avoid">
             <h3 className="bg-black text-white px-3 py-1 text-sm font-bold uppercase mb-3">Priority 01: Production Queue (FIFO PO Date)</h3>
             <table className="w-full border-collapse border border-black text-xs">
                <thead>
@@ -297,7 +297,7 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
           </div>
 
           {/* Section 3: Material Check */}
-          <div>
+          <div className="break-inside-avoid">
             <h3 className="bg-black text-white px-3 py-1 text-sm font-bold uppercase mb-3">Priority 03: Material Shortage Analysis</h3>
             <div className="grid grid-cols-2 gap-4">
                {analysis.materialAlerts.map((alert, idx) => (
@@ -313,7 +313,7 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
           </div>
 
           {/* Footer Signature */}
-          <div className="mt-16 flex justify-between text-[10px] border-t-2 border-black pt-4 text-black">
+          <div className="mt-16 flex justify-between text-[10px] border-t-2 border-black pt-4 text-black break-inside-avoid">
              <div className="w-48 text-center">
                 <p className="mb-8">Production Manager</p>
                 <div className="border-b border-black"></div>
