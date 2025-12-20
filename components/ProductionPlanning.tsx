@@ -150,7 +150,8 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
               totalNeeded: 0,
               available,
               shortfall: 0,
-              firstOrderDate: order.orderDate
+              // Use PO Date for planning, fallback to orderDate
+              firstOrderDate: order.poDate || order.orderDate
             });
           }
           const s = shortfallMap.get(key)!;
@@ -188,10 +189,10 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
           <h2 className="font-bold flex items-center gap-2"><Printer size={18} /> Production Planning Report</h2>
           <div className="flex gap-3">
             <button onClick={() => setViewMode('dashboard')} className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm">Back to View</button>
-            <button onClick={handlePrint} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-bold flex items-center gap-2">
+            <button onClick={handlePrint} className="px-4 py-2 bg-blue-600 hover:bg-blue-50 rounded-lg text-sm font-bold flex items-center gap-2">
               <Printer size={16} /> Print Report
             </button>
-            <button onClick={() => setViewMode('dashboard')} className="px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-sm"><X size={16}/></button>
+            <button onClick={() => setViewMode('dashboard')} className="px-4 py-2 bg-red-600 hover:bg-red-50 rounded-lg text-sm"><X size={16}/></button>
           </div>
         </div>
 
@@ -199,11 +200,11 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
           {/* Header */}
           <div className="border-b-2 border-black pb-4 mb-6 flex justify-between items-end">
             <div>
-              <h1 className="text-3xl font-black uppercase tracking-tighter">Production Planning Report</h1>
+              <h1 className="text-3xl font-black uppercase tracking-tighter text-black">Production Planning Report</h1>
               <p className="text-sm font-medium text-gray-600">Based on Active Sales Orders & Live Inventory</p>
             </div>
             <div className="text-right">
-              <p className="font-bold text-lg">Date: {formatDDMMYYYY(new Date().toISOString().split('T')[0])}</p>
+              <p className="font-bold text-lg text-black">Date: {formatDDMMYYYY(new Date().toISOString().split('T')[0])}</p>
               <p className="text-xs text-gray-500 font-mono">APP_ENV: PRODUCTION_PLAN_V1</p>
             </div>
           </div>
@@ -212,11 +213,11 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
           <div className="grid grid-cols-3 gap-4 mb-8">
             <div className="border border-black p-4 text-center">
               <p className="text-[10px] font-bold uppercase text-gray-500">Pending Orders</p>
-              <p className="text-2xl font-black">{analysis.orderDetails.length}</p>
+              <p className="text-2xl font-black text-black">{analysis.orderDetails.length}</p>
             </div>
             <div className="border border-black p-4 text-center">
               <p className="text-[10px] font-bold uppercase text-gray-500">Prod. Shortfall Items</p>
-              <p className="text-2xl font-black">{analysis.priorities.length}</p>
+              <p className="text-2xl font-black text-black">{analysis.priorities.length}</p>
             </div>
             <div className="border border-black p-4 text-center">
               <p className="text-[10px] font-bold uppercase text-gray-500">Critical Materials</p>
@@ -226,27 +227,27 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
 
           {/* Section 1: Priorities */}
           <div className="mb-8">
-            <h3 className="bg-black text-white px-3 py-1 text-sm font-bold uppercase mb-3">Priority 01: Production Queue (FIFO Order Age)</h3>
+            <h3 className="bg-black text-white px-3 py-1 text-sm font-bold uppercase mb-3">Priority 01: Production Queue (FIFO PO Date)</h3>
             <table className="w-full border-collapse border border-black text-xs">
                <thead>
                  <tr className="bg-gray-100">
-                    <th className="border border-black px-2 py-1 text-left">Rank</th>
-                    <th className="border border-black px-2 py-1 text-left">Product / Description</th>
-                    <th className="border border-black px-2 py-1 text-right">Required (Kg)</th>
-                    <th className="border border-black px-2 py-1 text-right">In Stock (Kg)</th>
-                    <th className="border border-black px-2 py-1 text-right bg-gray-200">Production Needed</th>
-                    <th className="border border-black px-2 py-1 text-center">First Order</th>
+                    <th className="border border-black px-2 py-1 text-left text-black">Rank</th>
+                    <th className="border border-black px-2 py-1 text-left text-black">Product / Description</th>
+                    <th className="border border-black px-2 py-1 text-right text-black">Required (Kg)</th>
+                    <th className="border border-black px-2 py-1 text-right text-black">In Stock (Kg)</th>
+                    <th className="border border-black px-2 py-1 text-right bg-gray-200 text-black">Production Needed</th>
+                    <th className="border border-black px-2 py-1 text-center text-black">First PO Date</th>
                  </tr>
                </thead>
                <tbody>
                   {analysis.priorities.map((p, idx) => (
                     <tr key={idx}>
-                       <td className="border border-black px-2 py-1 font-bold">{idx + 1}</td>
-                       <td className="border border-black px-2 py-1">{p.productName} ({p.size})</td>
-                       <td className="border border-black px-2 py-1 text-right">{p.totalNeeded.toLocaleString()}</td>
-                       <td className="border border-black px-2 py-1 text-right">{p.available.toLocaleString()}</td>
+                       <td className="border border-black px-2 py-1 font-bold text-black">{idx + 1}</td>
+                       <td className="border border-black px-2 py-1 text-black">{p.productName} ({p.size})</td>
+                       <td className="border border-black px-2 py-1 text-right text-black">{p.totalNeeded.toLocaleString()}</td>
+                       <td className="border border-black px-2 py-1 text-right text-black">{p.available.toLocaleString()}</td>
                        <td className="border border-black px-2 py-1 text-right font-black text-red-600">{p.shortfall.toLocaleString()} kg</td>
-                       <td className="border border-black px-2 py-1 text-center font-mono">{formatDDMMYYYY(p.firstOrderDate)}</td>
+                       <td className="border border-black px-2 py-1 text-center font-mono text-black">{formatDDMMYYYY(p.firstOrderDate)}</td>
                     </tr>
                   ))}
                   {analysis.priorities.length === 0 && (
@@ -264,8 +265,8 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
                 <div key={idx} className={`border border-black p-3 break-inside-avoid ${isReady ? 'bg-gray-50' : 'bg-white'}`}>
                    <div className="flex justify-between items-start border-b border-black pb-1 mb-2">
                       <div>
-                        <span className="font-black text-sm uppercase">{order.customerName}</span>
-                        <span className="ml-2 text-[10px] text-gray-600">PO: {order.poNumber} | {formatDDMMYYYY(order.orderDate)} | Rep: {order.salesPerson}</span>
+                        <span className="font-black text-sm uppercase text-black">{order.customerName}</span>
+                        <span className="ml-2 text-[10px] text-gray-600">PO: {order.poNumber} | PO Date: {formatDDMMYYYY(order.poDate || order.orderDate)} | Rep: {order.salesPerson}</span>
                       </div>
                       <div className={`px-2 py-0.5 rounded text-[10px] font-bold border border-black ${isReady ? 'bg-black text-white' : 'text-black'}`}>
                         {isReady ? 'READY TO DISPATCH' : 'SHORTAGE DETECTED'}
@@ -275,14 +276,14 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
                    <div className="grid grid-cols-2 gap-2">
                       {isReady ? (
                         order.items.map((item, iIdx) => (
-                          <div key={iIdx} className="flex justify-between text-[10px] font-mono border-b border-dotted border-gray-300">
+                          <div key={iIdx} className="flex justify-between text-[10px] font-mono border-b border-dotted border-gray-300 text-black">
                              <span>{item.productName} ({item.size})</span>
                              <span className="font-bold text-green-700">{item.calculatedWeightKg.toLocaleString()} kg (OK)</span>
                           </div>
                         ))
                       ) : (
                         shortfallItems.map((item, iIdx) => (
-                           <div key={iIdx} className="flex justify-between text-[10px] font-mono border-b border-dotted border-gray-300">
+                           <div key={iIdx} className="flex justify-between text-[10px] font-mono border-b border-dotted border-gray-300 text-black">
                              <span>{item.productName} ({item.size})</span>
                              <span className="font-bold text-red-600">Miss: {(item.calculatedWeightKg - item.available).toLocaleString()} kg</span>
                            </div>
@@ -300,19 +301,19 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
             <h3 className="bg-black text-white px-3 py-1 text-sm font-bold uppercase mb-3">Priority 03: Material Shortage Analysis</h3>
             <div className="grid grid-cols-2 gap-4">
                {analysis.materialAlerts.map((alert, idx) => (
-                 <div key={idx} className="border border-black p-2 flex justify-between items-center font-mono text-[10px]">
-                    <span className="font-bold uppercase">{alert.name}</span>
+                 <div key={idx} className="border border-black p-2 flex justify-between items-center font-mono text-[10px] text-black">
+                    <span className="font-bold uppercase text-black">{alert.name}</span>
                     <span className="text-red-600 font-black">Stock: {alert.stock.toLocaleString()} {alert.unit}</span>
                  </div>
                ))}
                {analysis.materialAlerts.length === 0 && (
-                 <div className="col-span-2 border border-black p-4 text-center italic text-[10px]">All essential packing materials are currently within safe operating thresholds.</div>
+                 <div className="col-span-2 border border-black p-4 text-center italic text-[10px] text-gray-500">All essential packing materials are currently within safe operating thresholds.</div>
                )}
             </div>
           </div>
 
           {/* Footer Signature */}
-          <div className="mt-16 flex justify-between text-[10px] border-t-2 border-black pt-4">
+          <div className="mt-16 flex justify-between text-[10px] border-t-2 border-black pt-4 text-black">
              <div className="w-48 text-center">
                 <p className="mb-8">Production Manager</p>
                 <div className="border-b border-black"></div>
@@ -372,7 +373,7 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
           <div className="px-6 py-4 border-b border-gray-100 bg-indigo-600 text-white flex justify-between items-center">
             <h3 className="font-bold flex items-center gap-2">
-              <TrendingUp size={18} /> Production Priority (FIFO)
+              <TrendingUp size={18} /> Production Priority (FIFO PO Date)
             </h3>
             <span className="text-xs bg-white/20 px-2 py-0.5 rounded font-bold uppercase">Urgent List</span>
           </div>
@@ -383,7 +384,7 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
                     <th className="px-6 py-3 font-medium">Rank</th>
                     <th className="px-6 py-3 font-medium">Product / Size</th>
                     <th className="px-6 py-3 font-medium text-right">Shortfall (Kg)</th>
-                    <th className="px-6 py-3 font-medium text-center">First Order</th>
+                    <th className="px-6 py-3 font-medium text-center">First PO Date</th>
                  </tr>
                </thead>
                <tbody className="divide-y divide-gray-100">
@@ -442,7 +443,7 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
                                 {isReady ? 'Ready' : 'Incomplete'}
                               </span>
                            </div>
-                           <p className="text-xs text-gray-500">Rep: {order.salesPerson} | PO: {order.poNumber} | {formatDDMMYYYY(order.orderDate)}</p>
+                           <p className="text-xs text-gray-500">Rep: {order.salesPerson} | PO: {order.poNumber} | PO Date: {formatDDMMYYYY(order.poDate || order.orderDate)}</p>
                         </div>
                         <div className="text-right">
                            <div className="text-sm font-bold text-indigo-600">{order.totalWeightKg.toLocaleString()} Kg</div>
@@ -453,7 +454,7 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
                      <div className={`p-3 rounded-lg border mt-2 ${isReady ? 'bg-green-100/30 border-green-200' : 'bg-red-50 border-red-100'}`}>
                         <p className={`text-[10px] font-bold uppercase mb-2 flex items-center gap-1 ${isReady ? 'text-green-700' : 'text-red-600'}`}>
                            {isReady ? <CheckCircle2 size={12} /> : <AlertTriangle size={12} />} 
-                           {isReady ? 'Order Inventory Status:' : 'Shortfall Alert:'}
+                           {isReady ? 'Order Inventory Status (OK):' : 'Shortfall Alert:'}
                         </p>
                         <div className="space-y-1">
                            {isReady ? (
