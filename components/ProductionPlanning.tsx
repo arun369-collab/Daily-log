@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { ProductionRecord, SalesOrder, StockTransaction, PackingStockItem } from '../types';
-import { ClipboardList, AlertTriangle, CheckCircle2, Factory, Package, ArrowRight, User, TrendingUp, Info, Printer, Eye, X, Calendar, Box, Layers, Gauge } from 'lucide-react';
+import { ClipboardList, AlertTriangle, CheckCircle2, Factory, Package, ArrowRight, User, TrendingUp, Info, Printer, Eye, X, Calendar, Box, Layers, Gauge, ToggleLeft, ToggleRight } from 'lucide-react';
 import { getStockTransactions } from '../services/storageService';
 
 // Master Data required for calculations
@@ -39,6 +39,7 @@ interface ProductionPlanningProps {
 
 export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records, orders }) => {
   const [viewMode, setViewMode] = useState<'dashboard' | 'print'>('dashboard');
+  const [includeCapacity, setIncludeCapacity] = useState(true);
   const transactions = useMemo(() => getStockTransactions(), []);
 
   const formatDDMMYYYY = (dateStr: string) => {
@@ -111,38 +112,34 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
     return stockMap;
   }, [records, transactions]);
 
-  // --- CAN-PACK ANALYSIS LOGIC ---
   const canPackAnalysis = useMemo(() => {
     const getS = (id: string) => packingStock.get(id) || 0;
-
-    const results = [
+    return [
       {
         line: '6013 Normal',
         capacityKg: Math.min(getS('PD1001') * 4, getS('PC1003') * 16),
         bottleneck: (getS('PD1001') * 4 < getS('PC1003') * 16) ? 'Packets' : 'Cartons',
-        details: `Packets: ${getS('PD1001').toLocaleString()} | Cartons: ${getS('PC1003').toLocaleString()}`
+        details: `Pkts: ${getS('PD1001').toLocaleString()} | Ctns: ${getS('PC1003').toLocaleString()}`
       },
       {
         line: '7018 Normal (5kg)',
         capacityKg: Math.min(getS('PD1002') * 5, getS('PC1002') * 20),
         bottleneck: (getS('PD1002') * 5 < getS('PC1002') * 20) ? 'Packets' : 'Cartons',
-        details: `Packets: ${getS('PD1002').toLocaleString()} | Cartons: ${getS('PC1002').toLocaleString()}`
+        details: `Pkts: ${getS('PD1002').toLocaleString()} | Ctns: ${getS('PC1002').toLocaleString()}`
       },
       {
         line: '7018 Vacuum',
         capacityKg: Math.min(getS('PD1006') * 2, getS('PC1005') * 20, (getS('VP1002') || 0) * 2),
         bottleneck: (getS('PD1006') * 2 <= getS('PC1005') * 20) ? 'Packets' : 'Cartons',
-        details: `Vac-Pkts: ${getS('PD1006').toLocaleString()} | Foil: ${getS('VP1002').toLocaleString()}`
+        details: `Vac: ${getS('PD1006').toLocaleString()} | Foil: ${getS('VP1002').toLocaleString()}`
       },
       {
         line: 'Ni / NiFe Containers',
         capacityKg: Math.min((getS('PB1001') + getS('PB1002')) * 1, getS('PC1003') * 10),
         bottleneck: ((getS('PB1001') + getS('PB1002')) * 1 < getS('PC1003') * 10) ? 'Containers' : 'Cartons',
-        details: `Boxes: ${(getS('PB1001') + getS('PB1002')).toLocaleString()} | Cartons: ${getS('PC1003').toLocaleString()}`
+        details: `Boxes: ${(getS('PB1001') + getS('PB1002')).toLocaleString()} | Ctns: ${getS('PC1003').toLocaleString()}`
       }
     ];
-
-    return results;
   }, [packingStock]);
 
   const analysis = useMemo(() => {
@@ -254,18 +251,72 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
             </table>
           </div>
 
-          {/* Section 2: Capacity Analysis (PRINT MODE) */}
-          <div className="mb-8 break-inside-avoid">
-            <h3 className="bg-black text-white px-3 py-1 text-sm font-bold uppercase mb-3">Priority 02: Material-Based Packing Capacity</h3>
-            <div className="grid grid-cols-2 gap-4">
-              {canPackAnalysis.map((item, idx) => (
-                <div key={idx} className="border border-black p-3 font-mono">
-                   <div className="font-black text-xs uppercase mb-1">{item.line}</div>
-                   <div className="flex justify-between items-center text-[10px]">
-                      <span>Max Potential:</span>
-                      <span className="font-black">{(item.capacityKg / 1000).toFixed(1)} TONS ({item.capacityKg.toLocaleString()} Kg)</span>
+          {/* Section 2: Capacity Analysis (Conditional) */}
+          {includeCapacity && (
+            <div className="mb-8 break-inside-avoid">
+              <h3 className="bg-black text-white px-3 py-1 text-sm font-bold uppercase mb-3">Priority 02: Material-Based Packing Capacity</h3>
+              <div className="grid grid-cols-2 gap-4">
+                {canPackAnalysis.map((item, idx) => (
+                  <div key={idx} className="border border-black p-3 font-mono bg-gray-50/50">
+                     <div className="font-black text-xs uppercase mb-1">{item.line}</div>
+                     <div className="flex justify-between items-center text-[10px]">
+                        <span>Max Potential:</span>
+                        <span className="font-black">{(item.capacityKg / 1000).toFixed(1)} TONS ({item.capacityKg.toLocaleString()} Kg)</span>
+                     </div>
+                     <div className="text-[8px] text-gray-500 mt-1 italic font-bold">Bottleneck: {item.bottleneck} | {item.details}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Section 3: RESTORED Order Fulfillment Details */}
+          <div className="mb-8">
+            <h3 className="bg-black text-white px-3 py-1 text-sm font-bold uppercase mb-3">Priority 03: Sales Order Fulfillment Breakdown</h3>
+            <div className="space-y-4">
+              {analysis.orderDetails.map(({ order, isReady, shortfallItems }, idx) => (
+                <div key={idx} className={`border border-black p-3 break-inside-avoid ${isReady ? 'bg-gray-50' : 'bg-white'}`}>
+                   <div className="flex justify-between items-start border-b border-black pb-1 mb-2">
+                      <div>
+                        <span className="font-black text-sm uppercase text-black">{order.customerName}</span>
+                        <span className="ml-2 text-[10px] text-gray-600">PO: {order.poNumber} | PO Date: {formatDDMMYYYY(order.poDate || order.orderDate)}</span>
+                      </div>
+                      <div className={`px-2 py-0.5 rounded text-[10px] font-bold border border-black ${isReady ? 'bg-black text-white' : 'text-black'}`}>
+                        {isReady ? 'READY TO DISPATCH' : 'INCOMPLETE - MISSING STOCK'}
+                      </div>
                    </div>
-                   <div className="text-[8px] text-gray-500 mt-1 italic">Bottleneck: {item.bottleneck} | {item.details}</div>
+                   
+                   <div className="space-y-1">
+                      {isReady ? (
+                        order.items.map((item, iIdx) => (
+                          <div key={iIdx} className="flex justify-between text-[10px] font-mono border-b border-dotted border-gray-300 text-black py-0.5 last:border-0">
+                             <span className="flex items-center gap-1.5">
+                                <span className="w-3.5 h-3.5 rounded-full border border-black flex items-center justify-center text-[8px] font-bold">{iIdx + 1}</span>
+                                {item.productName} ({item.size})
+                             </span>
+                             <span className="font-bold text-green-700">{item.calculatedWeightKg.toLocaleString()} kg (IN-STOCK)</span>
+                          </div>
+                        ))
+                      ) : (
+                        order.items.map((item, iIdx) => {
+                           const available = fgStock.get(`${item.productName.toLowerCase().replace(/\s/g, '')}|${item.size.toLowerCase().replace(/\s/g, '')}`) || 0;
+                           const isItemReady = available >= item.calculatedWeightKg;
+                           return (
+                             <div key={iIdx} className="flex justify-between text-[10px] font-mono border-b border-dotted border-gray-300 text-black py-0.5 last:border-0">
+                               <span className="flex items-center gap-1.5">
+                                  <span className="w-3.5 h-3.5 rounded-full border border-black flex items-center justify-center text-[8px] font-bold">{iIdx + 1}</span>
+                                  {item.productName} ({item.size})
+                               </span>
+                               {isItemReady ? (
+                                 <span className="font-bold text-green-700">{item.calculatedWeightKg.toLocaleString()} kg (OK)</span>
+                               ) : (
+                                 <span className="font-bold text-red-600">Miss: {(item.calculatedWeightKg - available).toLocaleString()} kg</span>
+                               )}
+                             </div>
+                           );
+                        })
+                      )}
+                   </div>
                 </div>
               ))}
             </div>
@@ -301,75 +352,91 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
             <div className="p-3 bg-indigo-50 text-indigo-600 rounded-lg"><Factory size={24}/></div>
             <div>
-                <p className="text-sm font-medium text-gray-500">Products to Produce</p>
+                <p className="text-sm font-medium text-gray-500">Shortage Items</p>
                 <h3 className="text-2xl font-bold text-indigo-600">{analysis.priorities.length}</h3>
             </div>
           </div>
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
             <div className="p-3 bg-red-50 text-red-600 rounded-lg"><Package size={24}/></div>
             <div>
-                <p className="text-sm font-medium text-gray-500">Packing Shortages</p>
+                <p className="text-sm font-medium text-gray-500">Packing Alerts</p>
                 <h3 className="text-2xl font-bold text-red-600">{analysis.materialAlerts.length}</h3>
             </div>
           </div>
         </div>
 
-        <button 
-          onClick={() => setViewMode('print')}
-          className="w-full md:w-auto px-6 py-4 bg-gray-900 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-xl hover:bg-black transition-all group"
-        >
-          <Printer size={20} className="group-hover:scale-110 transition-transform" /> 
-          Planning Report
-        </button>
+        <div className="flex flex-col gap-3 w-full md:w-auto">
+          {/* Include Capacity Toggle Tab */}
+          <div className="flex bg-white p-1 rounded-xl border border-gray-200 shadow-sm">
+             <button 
+              onClick={() => setIncludeCapacity(true)}
+              className={`flex-1 md:px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${includeCapacity ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}
+             >
+               <Layers size={14}/> With Capacity
+             </button>
+             <button 
+              onClick={() => setIncludeCapacity(false)}
+              className={`flex-1 md:px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${!includeCapacity ? 'bg-gray-800 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}
+             >
+               <Layers size={14}/> Orders Only
+             </button>
+          </div>
+          
+          <button 
+            onClick={() => setViewMode('print')}
+            className="w-full px-6 py-4 bg-gray-900 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-xl hover:bg-black transition-all group"
+          >
+            <Printer size={20} className="group-hover:scale-110 transition-transform" /> 
+            Planning Report
+          </button>
+        </div>
       </div>
 
-      {/* NEW: CAN-PACK CAPACITY ANALYZER */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-         <div className="px-6 py-4 border-b border-gray-100 bg-emerald-600 text-white flex justify-between items-center">
-            <div className="flex items-center gap-2">
-               <Gauge size={20} />
-               <h3 className="font-bold">Can-Pack Analysis (Material Bottlenecks)</h3>
-            </div>
-            <div className="text-[10px] bg-white/20 px-2 py-0.5 rounded font-bold uppercase">Based on Inventory</div>
-         </div>
-         <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-               {canPackAnalysis.map((item, idx) => (
-                 <div key={idx} className="bg-gray-50 rounded-xl p-4 border border-gray-200 flex flex-col justify-between hover:border-emerald-300 transition-colors">
-                    <div>
-                       <div className="flex justify-between items-start mb-2">
-                          <span className="text-[10px] font-bold text-gray-400 uppercase">{item.line}</span>
-                          <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${item.capacityKg > 5000 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                            {item.capacityKg > 0 ? 'Production Possible' : 'Stopped'}
-                          </span>
-                       </div>
-                       <div className="text-2xl font-black text-gray-900">{(item.capacityKg / 1000).toFixed(1)} <span className="text-sm font-normal text-gray-400 uppercase">Tons</span></div>
-                       <div className="mt-1 text-[10px] text-gray-500 font-mono">{item.details}</div>
-                    </div>
-                    
-                    <div className="mt-4 pt-4 border-t border-gray-200">
-                       <div className="flex justify-between items-center text-[10px] mb-1">
-                          <span className="text-gray-400">Limiting Factor:</span>
-                          <span className="font-bold text-red-600 uppercase flex items-center gap-1">
-                            <AlertTriangle size={10}/> {item.bottleneck}
-                          </span>
-                       </div>
-                       <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                          <div 
-                            className={`h-full ${item.capacityKg > 5000 ? 'bg-emerald-500' : 'bg-red-500'}`} 
-                            style={{ width: `${Math.min(100, (item.capacityKg / 15000) * 100)}%` }}
-                          />
-                       </div>
-                    </div>
-                 </div>
-               ))}
-            </div>
-            <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-100 flex items-center gap-3 text-xs text-blue-700">
-               <Info size={16} />
-               <p>Use this table to decide which packing materials to order next. The "Tons" value shows the <b>maximum possible</b> you can pack before running out of the Limiting Factor.</p>
-            </div>
-         </div>
-      </div>
+      {/* CAN-PACK CAPACITY ANALYZER - Controlled by Tab/Toggle */}
+      {includeCapacity && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-fadeIn">
+           <div className="px-6 py-4 border-b border-gray-100 bg-emerald-600 text-white flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                 <Gauge size={20} />
+                 <h3 className="font-bold">Can-Pack Analysis (Material Bottlenecks)</h3>
+              </div>
+              <div className="text-[10px] bg-white/20 px-2 py-0.5 rounded font-bold uppercase">Based on Packing Stock</div>
+           </div>
+           <div className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                 {canPackAnalysis.map((item, idx) => (
+                   <div key={idx} className="bg-gray-50 rounded-xl p-4 border border-gray-200 flex flex-col justify-between hover:border-emerald-300 transition-colors">
+                      <div>
+                         <div className="flex justify-between items-start mb-2">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase">{item.line}</span>
+                            <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${item.capacityKg > 5000 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                              {item.capacityKg > 0 ? 'Packing Possible' : 'Material Empty'}
+                            </span>
+                         </div>
+                         <div className="text-2xl font-black text-gray-900">{(item.capacityKg / 1000).toFixed(1)} <span className="text-sm font-normal text-gray-400 uppercase">Tons</span></div>
+                         <div className="mt-1 text-[10px] text-gray-500 font-mono">{item.details}</div>
+                      </div>
+                      
+                      <div className="mt-4 pt-4 border-t border-gray-200">
+                         <div className="flex justify-between items-center text-[10px] mb-1">
+                            <span className="text-gray-400">Limiting Factor:</span>
+                            <span className="font-bold text-red-600 uppercase flex items-center gap-1">
+                              <AlertTriangle size={10}/> {item.bottleneck}
+                            </span>
+                         </div>
+                         <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                            <div 
+                              className={`h-full ${item.capacityKg > 5000 ? 'bg-emerald-500' : 'bg-red-500'}`} 
+                              style={{ width: `${Math.min(100, (item.capacityKg / 15000) * 100)}%` }}
+                            />
+                         </div>
+                      </div>
+                   </div>
+                 ))}
+              </div>
+           </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Production Priority Card */}
@@ -378,7 +445,7 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
             <h3 className="font-bold flex items-center gap-2">
               <TrendingUp size={18} /> Production Priority (FIFO PO Date)
             </h3>
-            <span className="text-xs bg-white/20 px-2 py-0.5 rounded font-bold uppercase">Urgent List</span>
+            <span className="text-xs bg-white/20 px-2 py-0.5 rounded font-bold uppercase tracking-wider">FIFO Required</span>
           </div>
           <div className="p-0 overflow-y-auto max-h-[600px]">
              <table className="w-full text-sm text-left">
@@ -392,7 +459,7 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
                </thead>
                <tbody className="divide-y divide-gray-100">
                   {analysis.priorities.map((p, idx) => (
-                    <tr key={idx} className="hover:bg-gray-50">
+                    <tr key={idx} className="hover:bg-gray-50 transition-colors">
                        <td className="px-6 py-4">
                           <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-bold ${idx === 0 ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
                             {idx + 1}
@@ -404,7 +471,7 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
                        </td>
                        <td className="px-6 py-4 text-right">
                           <div className="text-red-600 font-black">{p.shortfall.toLocaleString()} Kg</div>
-                          <div className="text-[10px] text-gray-400">Needed: {p.totalNeeded} | FG: {p.available}</div>
+                          <div className="text-[10px] text-gray-400">Total Need: {p.totalNeeded.toLocaleString()}</div>
                        </td>
                        <td className="px-6 py-4 text-center">
                           <div className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-1 rounded">
@@ -417,7 +484,7 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
                     <tr>
                       <td colSpan={4} className="px-6 py-20 text-center text-gray-400">
                          <CheckCircle2 size={32} className="mx-auto mb-2 text-green-500" />
-                         All pending orders have sufficient stock in FG.
+                         All pending orders have sufficient finished goods stock.
                       </td>
                     </tr>
                   )}
@@ -430,9 +497,9 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
           <div className="px-6 py-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
             <h3 className="font-bold text-gray-700 flex items-center gap-2">
-              <User size={18} /> Sales Fulfillment Report
+              <User size={18} /> Sales Fulfillment Details
             </h3>
-            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">By Order Date</div>
+            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Live Checklist</div>
           </div>
           <div className="p-0 overflow-y-auto max-h-[600px]">
              <div className="divide-y divide-gray-100">
@@ -443,44 +510,33 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
                            <div className="flex items-center gap-2">
                               <h4 className="font-bold text-gray-900">{order.customerName}</h4>
                               <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-tighter ${isReady ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                                {isReady ? 'Ready' : 'Incomplete'}
+                                {isReady ? 'Ready' : 'Shortage'}
                               </span>
                            </div>
-                           <p className="text-xs text-gray-500">Rep: {order.salesPerson} | PO: {order.poNumber} | PO Date: {formatDDMMYYYY(order.poDate || order.orderDate)}</p>
+                           <p className="text-xs text-gray-500 mt-0.5">PO: {order.poNumber} | PO Date: {formatDDMMYYYY(order.poDate || order.orderDate)}</p>
                         </div>
                         <div className="text-right">
                            <div className="text-sm font-bold text-indigo-600">{order.totalWeightKg.toLocaleString()} Kg</div>
-                           <div className="text-[10px] text-gray-400">{order.items.length} Product(s)</div>
+                           <div className="text-[10px] text-gray-400 uppercase font-bold">{order.items.length} Lines</div>
                         </div>
                      </div>
                      
                      <div className={`p-3 rounded-lg border mt-2 ${isReady ? 'bg-green-100/30 border-green-200' : 'bg-red-50 border-red-100'}`}>
-                        <p className={`text-[10px] font-bold uppercase mb-2 flex items-center gap-1 ${isReady ? 'text-green-700' : 'text-red-600'}`}>
-                           {isReady ? <CheckCircle2 size={12} /> : <AlertTriangle size={12} />} 
-                           {isReady ? 'Order Inventory Status (OK):' : 'Shortfall Alert:'}
-                        </p>
-                        <div className="space-y-1">
-                           {isReady ? (
-                             order.items.map((item, iIdx) => (
-                               <div key={iIdx} className="flex justify-between text-xs text-green-900 border-b border-green-100 last:border-0 py-1">
+                        <div className="space-y-1.5">
+                           {order.items.map((item, iIdx) => {
+                             const key = `${item.productName.toLowerCase().replace(/\s/g, '')}|${item.size.toLowerCase().replace(/\s/g, '')}`;
+                             const available = fgStock.get(key) || 0;
+                             const ok = available >= item.calculatedWeightKg;
+                             return (
+                               <div key={iIdx} className={`flex justify-between text-xs py-1 border-b last:border-0 ${ok ? 'text-green-900 border-green-100/50' : 'text-red-800 border-red-100/50'}`}>
                                   <span className="flex items-center gap-1.5">
-                                    <span className="w-4 h-4 rounded-full border border-green-300 flex items-center justify-center text-[8px] font-bold">{iIdx + 1}</span>
+                                    <span className={`w-4 h-4 rounded-full border flex items-center justify-center text-[8px] font-bold ${ok ? 'border-green-300 text-green-700' : 'border-red-300 text-red-700'}`}>{iIdx + 1}</span>
                                     {item.productName} ({item.size})
                                   </span>
-                                  <span className="font-bold">{item.calculatedWeightKg.toLocaleString()} Kg</span>
+                                  <span className="font-bold">{ok ? `${item.calculatedWeightKg.toLocaleString()} Kg (OK)` : `Missing ${(item.calculatedWeightKg - available).toLocaleString()} Kg`}</span>
                                </div>
-                             ))
-                           ) : (
-                             shortfallItems.map((item, iIdx) => (
-                               <div key={iIdx} className="flex justify-between text-xs text-red-800 border-b border-red-100 last:border-0 py-1">
-                                  <span className="flex items-center gap-1.5">
-                                    <span className="w-4 h-4 rounded-full border border-red-300 flex items-center justify-center text-[8px] font-bold">{iIdx + 1}</span>
-                                    {item.productName} ({item.size})
-                                  </span>
-                                  <span className="font-bold">Missing {(item.calculatedWeightKg - item.available).toLocaleString()} Kg</span>
-                               </div>
-                             ))
-                           )}
+                             );
+                           })}
                         </div>
                      </div>
                   </div>
