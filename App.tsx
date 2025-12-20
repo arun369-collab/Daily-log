@@ -585,6 +585,30 @@ function App() {
                     <span className="text-sm font-bold">Analytics</span>
                  </button>
                )}
+
+               {/* SALES SECTION FOR ADMIN/SALES */}
+               {(canAccess('sales_dashboard') || canAccess('sales_entry')) && (
+                  <div className="col-span-2 mt-4 mb-2">
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest px-1">Sales Management</p>
+                  </div>
+               )}
+               {canAccess('sales_dashboard') && (
+                 <button onClick={() => { setView('sales_dashboard'); setIsMobileMenuOpen(false); }} className="flex flex-col items-center p-4 bg-indigo-50 rounded-2xl text-indigo-700">
+                    <ShoppingBag size={32} className="mb-2" />
+                    <span className="text-sm font-bold">My Orders</span>
+                 </button>
+               )}
+               {canAccess('sales_entry') && (
+                 <button onClick={() => { setView('sales_entry'); setIsMobileMenuOpen(false); }} className="flex flex-col items-center p-4 bg-rose-50 rounded-2xl text-rose-700">
+                    <ShoppingCart size={32} className="mb-2" />
+                    <span className="text-sm font-bold">New Order</span>
+                 </button>
+               )}
+
+               <div className="col-span-2 mt-4 mb-2">
+                 <p className="text-xs font-bold text-gray-400 uppercase tracking-widest px-1">Production & Logistics</p>
+               </div>
+               
                {canAccess('ledger_sheet') && (
                  <button onClick={() => { setView('ledger_sheet'); setIsMobileMenuOpen(false); }} className="flex flex-col items-center p-4 bg-indigo-50 rounded-2xl text-indigo-700">
                     <FileText size={32} className="mb-2" />
@@ -621,6 +645,11 @@ function App() {
                     <span className="text-sm font-bold">Entry History</span>
                  </button>
                )}
+
+               <div className="col-span-2 mt-4 mb-2">
+                 <p className="text-xs font-bold text-gray-400 uppercase tracking-widest px-1">CRM & Analytics</p>
+               </div>
+               
                {canAccess('customers') && (
                  <button onClick={() => { setView('customers'); setIsMobileMenuOpen(false); }} className="flex flex-col items-center p-4 bg-blue-50 rounded-2xl text-blue-700">
                     <Users size={32} className="mb-2" />
