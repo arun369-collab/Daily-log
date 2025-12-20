@@ -23,7 +23,8 @@ import {
   ClipboardList,
   Menu,
   X,
-  Brain
+  Brain,
+  CalendarDays
 } from 'lucide-react';
 import { ViewState, ProductionRecord, UserRole, SalesOrder } from './types';
 import { getRecords, saveRecord, deleteRecord, getSalesOrders, saveSalesOrder, deleteSalesOrder, deleteSalesOrders } from './services/storageService';
@@ -43,6 +44,7 @@ import { PackingStock } from './components/PackingStock';
 import { VisualAnalytics } from './components/VisualAnalytics';
 import { FinishedGoodsStock } from './components/FinishedGoodsStock';
 import { CustomerBehaviour } from './components/CustomerBehaviour';
+import { ProductionPlanning } from './components/ProductionPlanning';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -319,6 +321,7 @@ function App() {
 
         <nav className="space-y-2 flex-1 overflow-y-auto px-6 pb-4 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
           {canAccess('dashboard') && <NavItem target="dashboard" icon={LayoutDashboard} label="Dashboard" />}
+          {canAccess('planning') && <NavItem target="planning" icon={CalendarDays} label="Planning" />}
           {canAccess('analytics') && <NavItem target="analytics" icon={PieChart} label="Analytics" />}
           {canAccess('entry') && <NavItem target="entry" icon={PlusCircle} label="Add Ledger Entry" />}
           {canAccess('ledger_sheet') && <NavItem target="ledger_sheet" icon={FileText} label="Daily Report" />}
@@ -360,6 +363,7 @@ function App() {
           <div>
             <h1 className="text-xl md:text-2xl font-bold text-gray-800">
               {view === 'dashboard' && 'Daily Summary'}
+              {view === 'planning' && 'Production Planning'}
               {view === 'analytics' && 'Visual Analytics'}
               {view === 'entry' && (editingRecord ? (editingRecord.isReturn ? 'Edit Return Entry' : 'Edit Ledger Entry') : 'New Ledger Entry')}
               {view === 'packing_stock' && 'Packing Material Stock'}
@@ -386,6 +390,7 @@ function App() {
 
         <div className="max-w-7xl mx-auto">
           {view === 'dashboard' && <Dashboard records={displayRecords} />}
+          {view === 'planning' && <ProductionPlanning records={records} orders={salesOrders} />}
           {view === 'analytics' && <VisualAnalytics records={displayRecords} />}
           
           {view === 'entry' && (
@@ -489,7 +494,7 @@ function App() {
          {userRole === 'admin' && (
            <>
              <MobileNavIcon target="dashboard" icon={LayoutDashboard} label="Home" />
-             <MobileNavIcon target="analytics" icon={PieChart} label="Stats" />
+             <MobileNavIcon target="planning" icon={CalendarDays} label="Plan" />
              <div className="relative -top-6">
                 <button 
                   onClick={() => { setView('entry'); setEditingRecord(null); }}
@@ -577,6 +582,12 @@ function App() {
                  <button onClick={() => { setView('dashboard'); setIsMobileMenuOpen(false); }} className="flex flex-col items-center p-4 bg-blue-50 rounded-2xl text-blue-700">
                     <LayoutDashboard size={32} className="mb-2" />
                     <span className="text-sm font-bold">Home</span>
+                 </button>
+               )}
+               {canAccess('planning') && (
+                 <button onClick={() => { setView('planning'); setIsMobileMenuOpen(false); }} className="flex flex-col items-center p-4 bg-indigo-50 rounded-2xl text-indigo-700">
+                    <CalendarDays size={32} className="mb-2" />
+                    <span className="text-sm font-bold">Planning</span>
                  </button>
                )}
                {canAccess('analytics') && (
