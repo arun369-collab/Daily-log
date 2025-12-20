@@ -6,7 +6,7 @@ import { POPreview } from './POPreview';
 import { DeliveryLedger } from './DeliveryLedger';
 import { saveSalesOrder, deleteSalesOrder, deleteSalesOrders } from '../services/storageService';
 
-// Standard Master Inventory Data for initial opening balances
+// Synchronized Master Inventory Data
 const MASTER_FG_OPENING = [
   { product: 'SPARKWELD 6013', size: '2.6 x 350', opening: 2214 },
   { product: 'SPARKWELD 6013', size: '3.2 x 350', opening: 4204 },
@@ -61,7 +61,6 @@ const MASTER_FG_OPENING = [
   { product: 'VACUUM 8018-G', size: '4.0 x 350', opening: 284 },
 ];
 
-// Helper to convert Base64 to File for sharing
 const dataURLtoFile = (dataurl: string, filename: string): File => {
   const arr = dataurl.split(',');
   const mimeMatch = arr[0].match(/:(.*?);/);
@@ -96,37 +95,30 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
   const [copyFeedback, setCopyFeedback] = useState(false);
   const [showPasteHint, setShowPasteHint] = useState(false);
   const [packFilter, setPackFilter] = useState<'all' | 'ready'>('all');
-  
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  // --- INVENTORY SNAPSHOT CALCULATION ---
-  const inventorySnapshot = useMemo(() => {
-    const normalize = (str: string) => str.toLowerCase().replace(/\s/g, '');
-    const stockMap = new Map<string, number>();
+  const normalize = (str: string) => str.toLowerCase().replace(/\s/g, '');
 
-    // Start with Master Openings
+  const inventorySnapshot = useMemo(() => {
+    const stockMap = new Map<string, number>();
     MASTER_FG_OPENING.forEach(item => {
       const key = `${normalize(item.product)}|${normalize(item.size)}`;
       stockMap.set(key, item.opening);
     });
 
-    // Add Production and Returns
     productionRecords.forEach(r => {
-      if (r.isDispatch) return;
+      if (r.date < '2025-12-01') return;
       const key = `${normalize(r.productName)}|${normalize(r.size)}`;
       const current = stockMap.get(key) || 0;
-      stockMap.set(key, current + r.weightKg);
-    });
-
-    // Subtract Dispatches (Manual and Order-based)
-    productionRecords.forEach(r => {
-      if (!r.isDispatch) return;
-      const key = `${normalize(r.productName)}|${normalize(r.size)}`;
-      const current = stockMap.get(key) || 0;
-      stockMap.set(key, current - r.weightKg);
+      if (r.isReturn || (!r.isDispatch && !r.isReturn)) {
+        stockMap.set(key, current + r.weightKg);
+      } else if (r.isDispatch) {
+        stockMap.set(key, current - r.weightKg);
+      }
     });
 
     orders.forEach(o => {
+      if (o.orderDate < '2025-12-01') return;
       if (o.status === 'Dispatched' || o.status === 'Delivered') {
         o.items.forEach(item => {
           const key = `${normalize(item.productName)}|${normalize(item.size)}`;
@@ -139,9 +131,7 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
     return stockMap;
   }, [productionRecords, orders]);
 
-  // --- PACKABILITY ENGINE ---
   const getPackability = (order: SalesOrder): PackabilityStatus => {
-    const normalize = (str: string) => str.toLowerCase().replace(/\s/g, '');
     const missingItems: PackabilityStatus['missingItems'] = [];
     let availableCount = 0;
 
@@ -167,48 +157,38 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
 
   const sortedOrders = useMemo(() => {
     let list = [...orders].sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime());
-    
     if (packFilter === 'ready' && userRole === 'admin') {
       list = list.filter(o => o.status === 'Pending' && getPackability(o).status === 'Ready');
     }
-    
     return list;
   }, [orders, inventorySnapshot, packFilter]);
 
   const toggleSelection = (id: string) => {
     const newSet = new Set(selectedIds);
-    if (newSet.has(id)) {
-      newSet.delete(id);
-    } else {
-      newSet.add(id);
-    }
+    if (newSet.has(id)) newSet.delete(id);
+    else newSet.add(id);
     setSelectedIds(newSet);
   };
 
   const toggleSelectAll = () => {
-    if (selectedIds.size === sortedOrders.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(sortedOrders.map(o => o.id)));
-    }
+    if (selectedIds.size === sortedOrders.length) setSelectedIds(new Set());
+    else setSelectedIds(new Set(sortedOrders.map(o => o.id)));
   };
 
   const handleBulkStatusUpdate = (newStatus: SalesOrder['status']) => {
     if (selectedIds.size === 0) return;
     sortedOrders.forEach(order => {
       if (selectedIds.has(order.id)) {
-        const updated = { ...order, status: newStatus };
-        saveSalesOrder(updated);
+        saveSalesOrder({ ...order, status: newStatus });
       }
     });
     onRefreshData();
     setSelectedIds(new Set());
-    alert(`Updated ${selectedIds.size} orders to ${newStatus}`);
   };
   
   const handleBulkDelete = () => {
     if (selectedIds.size === 0) return;
-    if (window.confirm(`Are you sure you want to PERMANENTLY delete ${selectedIds.size} orders?`)) {
+    if (window.confirm(`Delete ${selectedIds.size} orders?`)) {
       deleteSalesOrders(Array.from(selectedIds));
       setSelectedIds(new Set());
       onRefreshData();
@@ -216,10 +196,9 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
   };
 
   const handleDelete = (id: string) => {
-    if (window.confirm("Are you sure you want to PERMANENTLY delete this order?")) {
+    if (window.confirm("Delete this order?")) {
       deleteSalesOrder(id);
       onRefreshData();
-      if (selectedOrder?.id === id) setSelectedOrder(null);
     }
   };
 
@@ -227,136 +206,60 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
     const fmt = (d: string) => {
       if (!d) return 'N/A';
       const pts = d.split('-');
-      if (pts.length !== 3) return d;
-      const mos = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      return `${pts[2]} ${mos[parseInt(pts[1]) - 1]} ${pts[0]}`;
+      return pts.length === 3 ? `${pts[2]}-${pts[1]}-${pts[0]}` : d;
     };
-
-    let text = `*Sales Order Details* 📦\n`;
-    text += `Customer: ${order.customerName}\n`;
-    text += `Mobile: ${order.mobileNumber}\n`;
-    text += `Sales Person: ${order.salesPerson}\n`;
-    text += `City: ${order.city}\n`;
-    if(order.mapLink) text += `📍 ${order.mapLink}\n`;
-    text += `PO No: ${order.poNumber}\n`;
-    text += `PO Date: ${fmt(order.poDate)}\n`;
-    if(order.poFileName) text += `PO File: ${order.poFileName} (See Attachment)\n`;
-    
-    text += `\n*Items:* \n`;
-    order.items.forEach(item => {
-       text += `- ${item.productName} (${item.size}): ${item.quantityCtn} CTN (${item.calculatedWeightKg} Kg)\n`;
-    });
-    
+    let text = `*Sales Order Details* 📦\nCustomer: ${order.customerName}\nMobile: ${order.mobileNumber}\nCity: ${order.city}\nPO No: ${order.poNumber}\nPO Date: ${fmt(order.poDate)}\n\n*Items:* \n`;
+    order.items.forEach(item => { text += `- ${item.productName} (${item.size}): ${item.quantityCtn} CTN (${item.calculatedWeightKg} Kg)\n`; });
     text += `\n*Total Weight:* ${order.totalWeightKg.toLocaleString()} Kg`;
     return text;
   };
 
-  // --- MISSING HANDLERS ADDED BELOW ---
-
-  // Handler to view the PO file from base64 data
   const handleViewPOFile = (order: SalesOrder) => {
     if (!order.poFileData) return;
     const win = window.open();
-    if (win) {
-      win.document.write(`<iframe src="${order.poFileData}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
-    }
+    if (win) win.document.write(`<iframe src="${order.poFileData}" frameborder="0" style="width:100%; height:100%;"></iframe>`);
   };
 
-  // Handler to copy order summary to clipboard
   const handleCopy = async (order: SalesOrder) => {
-    const text = generateShareText(order);
     try {
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(generateShareText(order));
       setCopyFeedback(true);
       setTimeout(() => setCopyFeedback(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy text: ', err);
-    }
+    } catch (err) {}
   };
 
-  // Handler for native browser sharing
   const handleNativeShare = async (order: SalesOrder) => {
     const text = generateShareText(order);
-    const shareData: any = {
-      title: 'Sales Order Details',
-      text: text,
-    };
-
+    const shareData: any = { title: 'Sales Order', text };
     if (order.poFileData && order.poFileName) {
       try {
         const file = dataURLtoFile(order.poFileData, order.poFileName);
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-          shareData.files = [file];
-          // Backup copy text
-          try {
-            await navigator.clipboard.writeText(text);
-            setShowPasteHint(true);
-            setTimeout(() => setShowPasteHint(false), 8000);
-          } catch (e) {}
-        }
-      } catch (e) {
-        console.warn("File sharing preparation failed", e);
-      }
+        if (navigator.canShare && navigator.canShare({ files: [file] })) shareData.files = [file];
+      } catch (e) {}
     }
-
-    if (navigator.share) {
-      try {
-        await navigator.share(shareData);
-      } catch (err) {
-        console.error('Share failed', err);
-      }
-    } else {
-      handleCopy(order);
-    }
+    if (navigator.share) await navigator.share(shareData);
+    else handleCopy(order);
   };
 
-  // Handler to share order summary via WhatsApp
   const handleShareWhatsapp = async (order: SalesOrder) => {
     const text = generateShareText(order);
-    
     if (order.poFileData && order.poFileName && navigator.share) {
        try {
          const file = dataURLtoFile(order.poFileData, order.poFileName);
-         const shareData = {
-           files: [file],
-           title: 'Sales Order Details',
-           text: text
-         };
-         
-         if (navigator.canShare && navigator.canShare(shareData)) {
-            try {
-               await navigator.clipboard.writeText(text);
-               setShowPasteHint(true);
-               setTimeout(() => setShowPasteHint(false), 8000);
-            } catch(err) {}
-
-            await navigator.share(shareData);
+         if (navigator.canShare && navigator.canShare({ files: [file], text })) {
+            await navigator.clipboard.writeText(text);
+            setShowPasteHint(true);
+            setTimeout(() => setShowPasteHint(false), 8000);
+            await navigator.share({ files: [file], text });
             return;
          }
-       } catch (e) {
-         console.warn("File share failed, using URL fallback", e);
-       }
+       } catch (e) {}
     }
-
-    const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
-    window.open(url, '_blank');
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
   };
 
-  if (showPOPreview && selectedOrder) {
-    return <POPreview order={selectedOrder} onClose={() => setShowPOPreview(false)} />;
-  }
-
-  if (showDeliveryLedger) {
-    const selectedOrdersList = sortedOrders.filter(o => selectedIds.has(o.id));
-    return (
-      <DeliveryLedger 
-        orders={selectedOrdersList} 
-        productionRecords={productionRecords}
-        onClose={() => setShowDeliveryLedger(false)} 
-        onSaveUpdates={(updated) => { updated.forEach(o => saveSalesOrder(o)); onRefreshData(); }}
-      />
-    );
-  }
+  if (showPOPreview && selectedOrder) return <POPreview order={selectedOrder} onClose={() => setShowPOPreview(false)} />;
+  if (showDeliveryLedger) return <DeliveryLedger orders={sortedOrders.filter(o => selectedIds.has(o.id))} productionRecords={productionRecords} onClose={() => setShowDeliveryLedger(false)} onSaveUpdates={(upd) => { upd.forEach(o => saveSalesOrder(o)); onRefreshData(); }} />;
 
   return (
     <div className="space-y-6">
@@ -379,389 +282,123 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-lg"><CheckCircle2 size={24}/></div>
            <div>
               <p className="text-sm font-medium text-gray-500">Ready to Load</p>
-              <h3 className="text-2xl font-bold text-emerald-600">
-                {orders.filter(o => o.status === 'Pending' && getPackability(o).status === 'Ready').length}
-              </h3>
+              <h3 className="text-2xl font-bold text-emerald-600">{orders.filter(o => o.status === 'Pending' && getPackability(o).status === 'Ready').length}</h3>
            </div>
         </div>
       </div>
 
-      {/* Bulk Action Bar */}
       {selectedIds.size > 0 && userRole === 'admin' && (
-        <div className="bg-indigo-900 text-white p-4 rounded-xl shadow-md flex flex-col md:flex-row gap-4 justify-between items-center animate-fadeIn">
-          <div className="font-bold flex items-center gap-2">
-            <CheckCircle className="text-green-400" />
-            {selectedIds.size} Orders Selected
-          </div>
-          <div className="flex gap-2 flex-wrap justify-center">
-            <button 
-               onClick={() => setShowDeliveryLedger(true)}
-               className="px-4 py-2 bg-white text-indigo-900 hover:bg-indigo-50 rounded-lg text-sm font-bold transition-colors flex items-center gap-2"
-            >
-              <ClipboardList size={16} /> Prepare Delivery / Print Ledger
-            </button>
-            <div className="w-px bg-indigo-700 mx-2 hidden md:block"></div>
-            
-            {/* REVERSE STATUS OPTION */}
-            <button 
-              onClick={() => handleBulkStatusUpdate('Pending')}
-              className="px-4 py-2 bg-amber-600 hover:bg-amber-500 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-              title="Reverse back to Pending"
-            >
-              <RotateCcw size={16} /> Set Pending
-            </button>
-
-            <button 
-              onClick={() => handleBulkStatusUpdate('Processing')}
-              className="px-4 py-2 bg-indigo-700 hover:bg-indigo-600 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-            >
-              <Package size={16} /> Processing
-            </button>
-             <button 
-              onClick={() => handleBulkStatusUpdate('Dispatched')}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-50 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-            >
-              <Truck size={16} /> Dispatched
-            </button>
-            <div className="w-px bg-indigo-700 mx-2 hidden md:block"></div>
-            <button 
-              onClick={handleBulkDelete}
-              className="px-4 py-2 bg-red-600 hover:bg-red-50 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-            >
-              <Trash2 size={16} /> Delete
-            </button>
+        <div className="bg-indigo-900 text-white p-4 rounded-xl shadow-md flex flex-col md:flex-row gap-4 justify-between items-center">
+          <div className="font-bold flex items-center gap-2"><CheckCircle size={20} className="text-green-400" /> {selectedIds.size} Selected</div>
+          <div className="flex gap-2 flex-wrap">
+            <button onClick={() => setShowDeliveryLedger(true)} className="px-4 py-2 bg-white text-indigo-900 rounded-lg text-sm font-bold">Prepare Delivery</button>
+            <button onClick={() => handleBulkStatusUpdate('Pending')} className="px-3 py-2 bg-amber-600 rounded-lg text-sm">Set Pending</button>
+            <button onClick={() => handleBulkStatusUpdate('Processing')} className="px-3 py-2 bg-indigo-700 rounded-lg text-sm">Processing</button>
+            <button onClick={() => handleBulkStatusUpdate('Dispatched')} className="px-3 py-2 bg-blue-600 rounded-lg text-sm">Dispatched</button>
+            <button onClick={handleBulkDelete} className="px-3 py-2 bg-red-600 rounded-lg text-sm">Delete</button>
           </div>
         </div>
       )}
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 flex flex-col md:flex-row justify-between items-center bg-gray-50 gap-4">
-          <h3 className="font-bold text-gray-700 flex items-center gap-2">
-            <ShoppingBag size={18} /> Recent Orders
-          </h3>
-          
-          <div className="flex items-center gap-2 w-full md:w-auto">
+        <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+          <h3 className="font-bold text-gray-700 flex items-center gap-2"><ShoppingBag size={18} /> Recent Orders</h3>
+          <div className="flex items-center gap-2">
             {userRole === 'admin' && (
-              <div className="flex bg-white border border-gray-200 rounded-lg p-1">
-                 <button 
-                  onClick={() => setPackFilter('all')}
-                  className={`px-3 py-1 text-xs font-bold rounded ${packFilter === 'all' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}
-                 >
-                   All
-                 </button>
-                 <button 
-                  onClick={() => setPackFilter('ready')}
-                  className={`px-3 py-1 text-xs font-bold rounded flex items-center gap-1 ${packFilter === 'ready' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}
-                 >
-                   <CheckCircle2 size={12}/> Ready
-                 </button>
+              <div className="flex bg-white border rounded-lg p-1">
+                 <button onClick={() => setPackFilter('all')} className={`px-3 py-1 text-xs font-bold rounded ${packFilter === 'all' ? 'bg-indigo-600 text-white' : 'text-gray-500'}`}>All</button>
+                 <button onClick={() => setPackFilter('ready')} className={`px-3 py-1 text-xs font-bold rounded ${packFilter === 'ready' ? 'bg-emerald-600 text-white' : 'text-gray-500'}`}>Ready</button>
               </div>
             )}
-            <button 
-              onClick={() => onEditOrder(null)}
-              className="flex-1 md:flex-none px-3 py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700 transition-colors flex items-center justify-center gap-1 shadow-sm"
-            >
-              <Plus size={14} /> New Order
-            </button>
-            <button 
-              onClick={onManualRefresh}
-              className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-gray-100 rounded-lg transition-colors"
-              title="Refresh List"
-            >
-              <RefreshCw size={18} />
-            </button>
+            <button onClick={() => onEditOrder(null)} className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-lg shadow-sm">New Order</button>
+            <button onClick={onManualRefresh} className="p-1.5 text-gray-400 hover:text-indigo-600 transition-colors"><RefreshCw size={18} /></button>
           </div>
         </div>
-
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="bg-gray-50 text-gray-500 border-b border-gray-100">
               <tr>
-                {userRole === 'admin' && (
-                  <th className="px-4 py-3 w-10">
-                    <input 
-                      type="checkbox" 
-                      onChange={toggleSelectAll} 
-                      checked={selectedIds.size > 0 && selectedIds.size === sortedOrders.length}
-                      className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" 
-                    />
-                  </th>
-                )}
+                {userRole === 'admin' && <th className="px-4 py-3"><input type="checkbox" onChange={toggleSelectAll} checked={selectedIds.size > 0 && selectedIds.size === sortedOrders.length} className="rounded" /></th>}
                 <th className="px-6 py-3 font-medium">Date</th>
                 <th className="px-6 py-3 font-medium">Customer</th>
-                {userRole === 'admin' && <th className="px-6 py-3 font-medium text-center">Packing Hint</th>}
-                <th className="px-6 py-3 font-medium">PO Details</th>
-                <th className="px-6 py-3 font-medium text-right">Weight</th>
-                <th className="px-6 py-3 font-medium text-center">Status</th>
-                <th className="px-6 py-3 font-medium text-center">Action</th>
+                {userRole === 'admin' && <th className="px-6 py-3 text-center">Pack Hint</th>}
+                <th className="px-6 py-3 font-medium">PO Ref</th>
+                <th className="px-6 py-3 text-right">Weight</th>
+                <th className="px-6 py-3 text-center">Status</th>
+                <th className="px-6 py-3 text-center">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {sortedOrders.map((order) => {
-                const packability = userRole === 'admin' ? getPackability(order) : null;
+                const pack = userRole === 'admin' ? getPackability(order) : null;
                 return (
-                <tr key={order.id} className={`hover:bg-gray-50 ${selectedIds.has(order.id) ? 'bg-indigo-50/50' : ''}`}>
-                  {userRole === 'admin' && (
-                    <td className="px-4 py-4 text-center">
-                       <input 
-                        type="checkbox" 
-                        checked={selectedIds.has(order.id)} 
-                        onChange={() => toggleSelection(order.id)}
-                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" 
-                      />
-                    </td>
-                  )}
-                  <td className="px-6 py-4 text-gray-600 whitespace-nowrap">
-                    {order.orderDate.split('-').reverse().join('-')}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="font-bold text-gray-900">{order.customerName}</div>
-                    <div className="text-xs text-gray-500 flex items-center gap-1 mt-1">
-                       <MapPin size={12} /> {order.city}
-                    </div>
-                  </td>
-                  
-                  {/* ADMIN PACKING HINT COLUMN */}
-                  {userRole === 'admin' && (
+                  <tr key={order.id} className={selectedIds.has(order.id) ? 'bg-indigo-50/50' : ''}>
+                    {userRole === 'admin' && <td className="px-4 py-4 text-center"><input type="checkbox" checked={selectedIds.has(order.id)} onChange={() => toggleSelection(order.id)} className="rounded" /></td>}
+                    <td className="px-6 py-4 whitespace-nowrap">{order.orderDate.split('-').reverse().join('-')}</td>
+                    <td className="px-6 py-4"><div className="font-bold">{order.customerName}</div><div className="text-xs text-gray-500">{order.city}</div></td>
+                    {userRole === 'admin' && (
+                      <td className="px-6 py-4 text-center">
+                        <span className={`px-2 py-1 rounded text-[10px] font-black uppercase ${pack?.status === 'Ready' ? 'bg-emerald-100 text-emerald-700' : pack?.status === 'Partial' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>
+                          {pack?.status}
+                        </span>
+                      </td>
+                    )}
+                    <td className="px-6 py-4 font-mono text-xs">{order.poNumber}</td>
+                    <td className="px-6 py-4 text-right font-bold text-indigo-600">{order.totalWeightKg.toLocaleString()} Kg</td>
                     <td className="px-6 py-4 text-center">
-                       {order.status === 'Pending' ? (
-                          <div className="group relative inline-block">
-                             <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-black uppercase tracking-tighter ${
-                               packability?.status === 'Ready' ? 'bg-emerald-100 text-emerald-700' :
-                               packability?.status === 'Partial' ? 'bg-amber-100 text-amber-700' :
-                               'bg-red-100 text-red-700'
-                             }`}>
-                               {packability?.status === 'Ready' && <CheckCircle2 size={12}/>}
-                               {packability?.status === 'Partial' && <Box size={12}/>}
-                               {packability?.status === 'Out of Stock' && <AlertCircle size={12}/>}
-                               {packability?.status}
-                             </span>
-                             
-                             {/* Hint Tooltip */}
-                             {packability?.missingItems && packability.missingItems.length > 0 && (
-                               <div className="absolute z-50 invisible group-hover:visible bg-gray-900 text-white text-[10px] p-2 rounded-lg shadow-xl w-48 -left-20 top-8 text-left">
-                                  <p className="font-bold border-b border-gray-700 pb-1 mb-1 text-red-400">Shortage List:</p>
-                                  {packability.missingItems.map((m, idx) => (
-                                    <div key={idx} className="flex justify-between py-0.5">
-                                      <span className="truncate pr-2">{m.product}</span>
-                                      <span className="font-mono text-red-300">{m.missingKg.toFixed(0)}kg</span>
-                                    </div>
-                                  ))}
-                                  <div className="mt-1 pt-1 border-t border-gray-700 italic text-gray-400">
-                                    Current FG stock is insufficient.
-                                  </div>
-                               </div>
-                             )}
-                          </div>
-                       ) : (
-                         <span className="text-gray-300 text-[10px]">—</span>
-                       )}
+                      <span className={`px-2 py-0.5 rounded-full text-xs ${order.status === 'Pending' ? 'bg-amber-100' : order.status === 'Processing' ? 'bg-blue-100' : 'bg-green-100'}`}>{order.status}</span>
                     </td>
-                  )}
-
-                  <td className="px-6 py-4">
-                     <div className="font-mono text-xs font-bold text-gray-600">{order.poNumber}</div>
-                     {order.poFileName && (
-                       <div className="text-xs text-blue-600 flex items-center gap-1 mt-1">
-                         <FileText size={10} /> {order.poFileName}
-                       </div>
-                     )}
-                  </td>
-                  <td className="px-6 py-4 text-right font-bold text-indigo-600 whitespace-nowrap">
-                    {order.totalWeightKg.toLocaleString()} Kg
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      order.status === 'Pending' ? 'bg-amber-100 text-amber-800' : 
-                      order.status === 'Processing' ? 'bg-blue-100 text-blue-800' : 
-                      order.status === 'Dispatched' ? 'bg-purple-100 text-purple-800' : 
-                      'bg-green-100 text-green-800'
-                    }`}>
-                      {order.status === 'Pending' && <Clock size={12} />}
-                      {order.status === 'Processing' && <Package size={12} />}
-                      {order.status === 'Dispatched' && <Truck size={12} />}
-                      {order.status === 'Delivered' && <CheckCircle size={12} />}
-                      {order.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <div className="flex justify-center gap-1">
-                       {userRole === 'admin' && (
-                         <>
-                            <button 
-                               onClick={() => onEditOrder(order)}
-                               className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
-                               title="Edit Order"
-                            >
-                               <Pencil size={18} />
-                            </button>
-                            <button 
-                               onClick={() => handleDelete(order.id)}
-                               className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
-                               title="Delete Order"
-                            >
-                               <Trash2 size={18} />
-                            </button>
-                         </>
-                       )}
-                       <button 
-                        onClick={() => setSelectedOrder(order)}
-                        className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors"
-                        title="View Details"
-                      >
-                        <Eye size={18} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              )})}
-              {orders.length === 0 && (
-                <tr>
-                   <td colSpan={userRole === 'admin' ? 8 : 7} className="px-6 py-12 text-center text-gray-400">
-                     No orders found.
-                   </td>
-                </tr>
-              )}
+                    <td className="px-6 py-4 text-center">
+                      <div className="flex justify-center gap-1">
+                        {userRole === 'admin' && <button onClick={() => onEditOrder(order)} className="p-2 text-gray-400 hover:text-blue-600"><Pencil size={18} /></button>}
+                        <button onClick={() => setSelectedOrder(order)} className="p-2 text-gray-400 hover:text-indigo-600"><Eye size={18} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Order Details Modal */}
       {selectedOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
-            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-              <div>
-                <h3 className="text-lg font-bold text-gray-800">Order Details</h3>
-                <p className="text-sm text-gray-500">PO: {selectedOrder.poNumber}</p>
-              </div>
-              <button 
-                onClick={() => setSelectedOrder(null)}
-                className="p-2 bg-white rounded-full text-gray-500 hover:bg-gray-100 transition-colors"
-              >
-                <X size={20} />
-              </button>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="px-6 py-4 border-b bg-gray-50 flex justify-between items-center">
+              <div><h3 className="text-lg font-bold">Order Details</h3><p className="text-sm text-gray-500">PO: {selectedOrder.poNumber}</p></div>
+              <button onClick={() => setSelectedOrder(null)} className="p-2 hover:bg-gray-200 rounded-full"><X size={20} /></button>
             </div>
-            
             <div className="p-6 overflow-y-auto">
                <div className="grid grid-cols-2 gap-6 mb-6">
                  <div>
-                    <h4 className="text-xs font-bold text-gray-400 uppercase mb-2">Customer</h4>
-                    <p className="font-bold text-gray-800">{selectedOrder.customerName}</p>
+                    <h4 className="text-[10px] font-bold text-gray-400 uppercase">Customer</h4>
+                    <p className="font-bold">{selectedOrder.customerName}</p>
                     <p className="text-sm text-gray-600">{selectedOrder.mobileNumber}</p>
-                    <p className="text-sm text-gray-600">{selectedOrder.email}</p>
-                    <p className="text-sm text-gray-600 flex items-center gap-1 mt-1">
-                      <MapPin size={14} /> {selectedOrder.city}
-                    </p>
-                    {selectedOrder.mapLink && (
-                      <a href={selectedOrder.mapLink} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline">
-                        View Delivery Location
-                      </a>
-                    )}
+                    <p className="text-sm text-gray-600">{selectedOrder.city}</p>
                  </div>
                  <div className="text-right">
-                    <h4 className="text-xs font-bold text-gray-400 uppercase mb-2">Order Info</h4>
-                    <p className="text-sm text-gray-600">Date: {selectedOrder.orderDate.split('-').reverse().join('-')}</p>
-                    <p className="text-sm text-gray-600">Rep: {selectedOrder.salesPerson}</p>
-                    <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium mt-2 ${
-                      selectedOrder.status === 'Pending' ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'
-                    }`}>
-                      {selectedOrder.status}
-                    </div>
+                    <h4 className="text-[10px] font-bold text-gray-400 uppercase">Rep</h4>
+                    <p className="text-sm">{selectedOrder.salesPerson}</p>
+                    <p className="text-sm">Date: {selectedOrder.orderDate.split('-').reverse().join('-')}</p>
                  </div>
                </div>
-
                <div className="border rounded-lg overflow-hidden mb-6">
                  <table className="w-full text-sm">
-                   <thead className="bg-gray-50 text-gray-500">
-                     <tr>
-                       <th className="px-4 py-2 text-left">Product</th>
-                       <th className="px-4 py-2 text-right">Size</th>
-                       <th className="px-4 py-2 text-right">Cartons</th>
-                       <th className="px-4 py-2 text-right">Weight (Kg)</th>
-                       {userRole === 'admin' && <th className="px-4 py-2 text-center">In Stock</th>}
-                     </tr>
-                   </thead>
-                   <tbody className="divide-y divide-gray-100">
-                     {selectedOrder.items.map((item, idx) => {
-                       const normalize = (str: string) => str.toLowerCase().replace(/\s/g, '');
-                       const key = `${normalize(item.productName)}|${normalize(item.size)}`;
-                       const available = inventorySnapshot.get(key) || 0;
-                       const isAvail = available >= item.calculatedWeightKg;
-
-                       return (
-                       <tr key={idx}>
-                         <td className="px-4 py-3 font-medium text-gray-800">{item.productName}</td>
-                         <td className="px-4 py-3 text-right text-gray-500">{item.size}</td>
-                         <td className="px-4 py-3 text-right text-gray-600">{item.quantityCtn}</td>
-                         <td className="px-4 py-3 text-right font-bold text-indigo-600">{item.calculatedWeightKg}</td>
-                         {userRole === 'admin' && (
-                           <td className="px-4 py-3 text-center">
-                              <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold ${isAvail ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                {isAvail ? 'YES' : `NO (${available.toFixed(0)}kg)`}
-                              </span>
-                           </td>
-                         )}
-                       </tr>
-                     )})}
-                   </tbody>
-                   <tfoot className="bg-gray-50 font-bold">
-                      <tr>
-                        <td colSpan={3} className="px-4 py-3 text-right text-gray-600">Total:</td>
-                        <td className="px-4 py-3 text-right text-indigo-700">{selectedOrder.totalWeightKg.toLocaleString()} Kg</td>
-                        {userRole === 'admin' && <td className="bg-gray-50"></td>}
-                      </tr>
-                   </tfoot>
+                   <thead className="bg-gray-50"><tr><th className="px-4 py-2 text-left">Product</th><th className="px-4 py-2 text-right">Size</th><th className="px-4 py-2 text-right">Kg</th></tr></thead>
+                   <tbody>{selectedOrder.items.map((it, ix) => (<tr key={ix} className="border-b"><td className="px-4 py-3 font-medium">{it.productName}</td><td className="px-4 py-3 text-right">{it.size}</td><td className="px-4 py-3 text-right font-bold">{it.calculatedWeightKg}</td></tr>))}</tbody>
                  </table>
                </div>
-               
-               <div className="flex gap-3 mb-4 justify-end flex-wrap">
-                   {selectedOrder.poFileData && (
-                      <button 
-                         onClick={() => handleViewPOFile(selectedOrder)}
-                         className="px-4 py-2 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-lg font-medium flex items-center gap-2 transition-colors text-sm"
-                       >
-                         <ExternalLink size={16} /> View Uploaded PO
-                       </button>
-                   )}
-                   <button 
-                     onClick={() => setShowPOPreview(true)}
-                     className="px-4 py-2 bg-gray-800 hover:bg-black text-white rounded-lg font-medium flex items-center gap-2 transition-colors text-sm"
-                   >
-                     <Printer size={16} /> View PO Document
-                   </button>
+               <div className="flex gap-3 flex-wrap justify-end mb-4">
+                  {selectedOrder.poFileData && <button onClick={() => handleViewPOFile(selectedOrder)} className="px-4 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm font-bold border border-blue-100">View PO File</button>}
+                  <button onClick={() => setShowPOPreview(true)} className="px-4 py-2 bg-gray-800 text-white rounded-lg text-sm font-bold">Print PO Document</button>
                </div>
-
                <div className="grid grid-cols-2 gap-3 mb-3">
-                 <button 
-                  onClick={() => handleCopy(selectedOrder)}
-                  className={`py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${
-                    copyFeedback ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                 >
-                   {copyFeedback ? <CheckCircle size={18} /> : <Copy size={18} />}
-                   {copyFeedback ? 'Copied' : 'Copy'}
-                 </button>
-                 <button
-                  onClick={() => handleNativeShare(selectedOrder)} 
-                  className="py-3 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-xl font-bold flex items-center justify-center gap-2 transition-all"
-                 >
-                   <Share2 size={18} /> Share
-                 </button>
+                 <button onClick={() => handleCopy(selectedOrder)} className={`py-3 rounded-xl font-bold flex items-center justify-center gap-2 ${copyFeedback ? 'bg-gray-800 text-white' : 'bg-gray-100'}`}>{copyFeedback ? <CheckCircle size={18} /> : <Copy size={18} />} Copy Text</button>
+                 <button onClick={() => handleNativeShare(selectedOrder)} className="py-3 bg-blue-100 text-blue-700 rounded-xl font-bold">Share</button>
                </div>
-
-               <button 
-                 onClick={() => handleShareWhatsapp(selectedOrder)}
-                 className="w-full py-3 bg-[#25D366] hover:bg-[#20bd5a] text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-green-200 transition-all"
-               >
-                 <MessageCircle size={20} /> Share via WhatsApp
-               </button>
-               {showPasteHint && (
-                 <p className="text-xs text-center text-green-600 mt-2 font-medium bg-green-50 p-2 rounded-lg border border-green-200 animate-pulse">
-                   Text copied! Paste in WhatsApp if missing.
-                 </p>
-               )}
+               <button onClick={() => handleShareWhatsapp(selectedOrder)} className="w-full py-3 bg-[#25D366] text-white rounded-xl font-bold flex justify-center items-center gap-2"><MessageCircle size={20} /> Share via WhatsApp</button>
+               {showPasteHint && <p className="text-[10px] text-center text-green-700 mt-2 font-bold uppercase animate-pulse">Text copied! Please Paste in WhatsApp if empty.</p>}
             </div>
           </div>
         </div>

@@ -89,14 +89,18 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
     return `${parts[2]}-${parts[1]}-${parts[0]}`;
   };
 
+  const normalize = (str: string) => str.toLowerCase().replace(/\s/g, '');
+
   const fgStock = useMemo(() => {
-    const normalize = (str: string) => str.toLowerCase().replace(/\s/g, '');
     const stockMap = new Map<string, number>();
     MASTER_FG_OPENING.forEach(item => {
       const key = `${normalize(item.product)}|${normalize(item.size)}`;
       stockMap.set(key, item.opening);
     });
+    
+    // Inventory calculation filtered by Opening Date (Dec 1st)
     records.forEach(r => {
+      if (r.date < '2025-12-01') return;
       const key = `${normalize(r.productName)}|${normalize(r.size)}`;
       const current = stockMap.get(key) || 0;
       if (r.isReturn || (!r.isDispatch && !r.isReturn)) {
@@ -105,7 +109,9 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
         stockMap.set(key, current - r.weightKg);
       }
     });
+    
     orders.forEach(o => {
+      if (o.orderDate < '2025-12-01') return;
       if (o.status === 'Dispatched' || o.status === 'Delivered') {
         o.items.forEach(item => {
           const key = `${normalize(item.productName)}|${normalize(item.size)}`;
@@ -120,14 +126,18 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
   const packingStock = useMemo(() => {
     const stockMap = new Map<string, number>();
     MASTER_PACKING_LIST.forEach(item => stockMap.set(item.id, item.openingStock));
+    
     transactions.forEach(txn => {
+      if (txn.date < '2025-12-01') return;
       const current = stockMap.get(txn.itemId) || 0;
       stockMap.set(txn.itemId, current + txn.qty);
     });
+    
     records.forEach(r => {
-      if (r.isReturn || r.isDispatch) return;
+      if (r.date < '2025-12-01' || r.isReturn || r.isDispatch) return;
       const prodName = r.productName.toUpperCase();
       const approxPktWeight = r.duplesPkt > 0 ? (r.weightKg / r.duplesPkt) : 0;
+      
       if (prodName.includes('6013')) {
         stockMap.set('PD1001', (stockMap.get('PD1001') || 0) - r.duplesPkt);
         stockMap.set('PC1003', (stockMap.get('PC1003') || 0) - r.cartonCtn);
@@ -183,7 +193,6 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
   }, [packingStock]);
 
   const analysis = useMemo(() => {
-    const normalize = (str: string) => str.toLowerCase().replace(/\s/g, '');
     const pending = orders.filter(o => o.status === 'Pending' || o.status === 'Processing')
                           .sort((a, b) => new Date(a.orderDate).getTime() - new Date(b.orderDate).getTime());
     const shortfallMap = new Map<string, { productName: string, size: string, totalNeeded: number, available: number, shortfall: number, firstOrderDate: string }>();
@@ -327,36 +336,23 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
                    </div>
                    
                    <div className="space-y-1">
-                      {isReady ? (
-                        order.items.map((item, iIdx) => (
-                          <div key={iIdx} className="flex justify-between text-[10px] font-mono border-b border-dotted border-gray-300 text-black py-0.5 last:border-0">
+                      {order.items.map((item, iIdx) => {
+                         const available = fgStock.get(`${normalize(item.productName)}|${normalize(item.size)}`) || 0;
+                         const ok = available >= item.calculatedWeightKg;
+                         return (
+                           <div key={iIdx} className="flex justify-between text-[10px] font-mono border-b border-dotted border-gray-300 text-black py-0.5 last:border-0">
                              <span className="flex items-center gap-1.5">
                                 <span className="w-3.5 h-3.5 rounded-full border border-black flex items-center justify-center text-[8px] font-bold">{iIdx + 1}</span>
                                 {item.productName} ({item.size})
                              </span>
-                             <span className="font-bold text-green-700">{item.calculatedWeightKg.toLocaleString()} kg (IN-STOCK)</span>
-                          </div>
-                        ))
-                      ) : (
-                        order.items.map((item, iIdx) => {
-                           const key = `${item.productName.toLowerCase().replace(/\s/g, '')}|${item.size.toLowerCase().replace(/\s/g, '')}`;
-                           const available = fgStock.get(key) || 0;
-                           const isItemReady = available >= item.calculatedWeightKg;
-                           return (
-                             <div key={iIdx} className="flex justify-between text-[10px] font-mono border-b border-dotted border-gray-300 text-black py-0.5 last:border-0">
-                               <span className="flex items-center gap-1.5">
-                                  <span className="w-3.5 h-3.5 rounded-full border border-black flex items-center justify-center text-[8px] font-bold">{iIdx + 1}</span>
-                                  {item.productName} ({item.size})
-                               </span>
-                               {isItemReady ? (
-                                 <span className="font-bold text-green-700">{item.calculatedWeightKg.toLocaleString()} kg (OK)</span>
-                               ) : (
-                                 <span className="font-bold text-red-600">Miss: {(item.calculatedWeightKg - available).toLocaleString()} kg</span>
-                               )}
-                             </div>
-                           );
-                        })
-                      )}
+                             {ok ? (
+                               <span className="font-bold text-green-700">{item.calculatedWeightKg.toLocaleString()} kg (OK)</span>
+                             ) : (
+                               <span className="font-bold text-red-600">Miss: {(item.calculatedWeightKg - available).toLocaleString()} kg</span>
+                             )}
+                           </div>
+                         );
+                      })}
                    </div>
                 </div>
               ))}
@@ -565,7 +561,7 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
                      <div className={`p-3 rounded-lg border mt-2 ${isReady ? 'bg-green-100/30 border-green-200' : 'bg-red-50 border-red-100'}`}>
                         <div className="space-y-1.5">
                            {order.items.map((item, iIdx) => {
-                             const key = `${item.productName.toLowerCase().replace(/\s/g, '')}|${item.size.toLowerCase().replace(/\s/g, '')}`;
+                             const key = `${normalize(item.productName)}|${normalize(item.size)}`;
                              const available = fgStock.get(key) || 0;
                              const ok = available >= item.calculatedWeightKg;
                              return (

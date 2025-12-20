@@ -3,11 +3,6 @@ import React, { useState, useMemo } from 'react';
 import { Warehouse, Download, Search, Info, Calendar, User, Package, Box, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ProductionRecord, SalesOrder } from '../types';
 
-interface FinishedGoodsStockProps {
-  records?: ProductionRecord[];
-  orders?: SalesOrder[];
-}
-
 interface FGDetail {
   date: string;
   reference: string;
@@ -15,7 +10,11 @@ interface FGDetail {
   info?: string;
 }
 
-// ... Master Data remains same ...
+interface FinishedGoodsStockProps {
+  records?: ProductionRecord[];
+  orders?: SalesOrder[];
+}
+
 const MASTER_FINISHED_GOODS = [
   { product: 'SPARKWELD 6013', size: '2.6 x 350', opening: 2214 },
   { product: 'SPARKWELD 6013', size: '3.2 x 350', opening: 4204 },
@@ -81,7 +80,6 @@ export const FinishedGoodsStock: React.FC<FinishedGoodsStockProps> = ({ records 
     type: 'PRODUCTION' | 'RETURN' | 'DESPATCH';
   } | null>(null);
 
-  // Helper to normalize strings for comparison
   const normalize = (str: string) => str.toLowerCase().replace(/\s/g, '');
 
   const formatFriendlyDate = (dateStr: string) => {
@@ -97,21 +95,21 @@ export const FinishedGoodsStock: React.FC<FinishedGoodsStockProps> = ({ records 
       const normName = normalize(item.product);
       const normSize = normalize(item.size);
 
-      // --- CALCULATE OPENING BALANCE AS OF START OF SELECTED DATE ---
+      // --- CALCULATE OPENING BALANCE AS OF START OF SELECTED DATE (Dec 1st filter) ---
       const prevProduction = records
-        .filter(r => normalize(r.productName) === normName && normalize(r.size) === normSize && !r.isReturn && !r.isDispatch && r.date < selectedDate)
+        .filter(r => normalize(r.productName) === normName && normalize(r.size) === normSize && !r.isReturn && !r.isDispatch && r.date >= '2025-12-01' && r.date < selectedDate)
         .reduce((sum, r) => sum + r.weightKg, 0);
 
       const prevReturn = records
-        .filter(r => normalize(r.productName) === normName && normalize(r.size) === normSize && r.isReturn && r.date < selectedDate)
+        .filter(r => normalize(r.productName) === normName && normalize(r.size) === normSize && r.isReturn && r.date >= '2025-12-01' && r.date < selectedDate)
         .reduce((sum, r) => sum + r.weightKg, 0);
 
       const prevManualDispatch = records
-        .filter(r => normalize(r.productName) === normName && normalize(r.size) === normSize && r.isDispatch && r.date < selectedDate)
+        .filter(r => normalize(r.productName) === normName && normalize(r.size) === normSize && r.isDispatch && r.date >= '2025-12-01' && r.date < selectedDate)
         .reduce((sum, r) => sum + r.weightKg, 0);
 
       const prevOrderDispatch = orders
-        .filter(o => (o.status === 'Dispatched' || o.status === 'Delivered') && o.orderDate < selectedDate)
+        .filter(o => (o.status === 'Dispatched' || o.status === 'Delivered') && o.orderDate >= '2025-12-01' && o.orderDate < selectedDate)
         .reduce((orderSum, order) => {
            return orderSum + order.items
              .filter(i => normalize(i.productName) === normName && normalize(i.size) === normSize)
@@ -205,7 +203,6 @@ export const FinishedGoodsStock: React.FC<FinishedGoodsStockProps> = ({ records 
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-3 w-full md:w-auto">
           <div className="bg-emerald-100 p-3 rounded-lg text-emerald-700">
@@ -290,13 +287,37 @@ export const FinishedGoodsStock: React.FC<FinishedGoodsStockProps> = ({ records 
                     <td className="border border-black px-3 py-1 text-right font-bold bg-[#e2efda] text-black">
                       {row.dynamicOpening.toLocaleString()}
                     </td>
-                    <td className={`border border-black px-3 py-1 text-right bg-[#e2efda] font-bold transition-colors ${row.production > 0 ? 'text-blue-700 cursor-help hover:bg-blue-50' : 'text-gray-400'}`}>
+                    <td 
+                      onMouseEnter={(e) => {
+                        if (row.production <= 0) return;
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setHoveredBreakdown({ x: rect.right, y: rect.top, data: row.productionBreakdown, title: row.product, type: 'PRODUCTION' });
+                      }}
+                      onMouseLeave={() => setHoveredBreakdown(null)}
+                      className={`border border-black px-3 py-1 text-right bg-[#e2efda] font-bold transition-colors ${row.production > 0 ? 'text-blue-700 cursor-help hover:bg-blue-50' : 'text-gray-400'}`}
+                    >
                       {row.production > 0 ? `+${row.production.toLocaleString()}` : '-'}
                     </td>
-                    <td className={`border border-black px-3 py-1 text-right bg-[#e2efda] font-bold transition-colors ${row.return > 0 ? 'text-orange-600 cursor-help hover:bg-orange-50' : 'text-gray-400'}`}>
+                    <td 
+                      onMouseEnter={(e) => {
+                        if (row.return <= 0) return;
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setHoveredBreakdown({ x: rect.right, y: rect.top, data: row.returnBreakdown, title: row.product, type: 'RETURN' });
+                      }}
+                      onMouseLeave={() => setHoveredBreakdown(null)}
+                      className={`border border-black px-3 py-1 text-right bg-[#e2efda] font-bold transition-colors ${row.return > 0 ? 'text-orange-600 cursor-help hover:bg-orange-50' : 'text-gray-400'}`}
+                    >
                       {row.return > 0 ? `+${row.return.toLocaleString()}` : '-'}
                     </td>
-                    <td className={`border border-black px-3 py-1 text-right bg-[#e2efda] font-bold transition-colors ${row.despatch > 0 ? 'text-red-700 cursor-help hover:bg-red-50' : 'text-gray-400'}`}>
+                    <td 
+                      onMouseEnter={(e) => {
+                        if (row.despatch <= 0) return;
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setHoveredBreakdown({ x: rect.right, y: rect.top, data: row.despatchBreakdown, title: row.product, type: 'DESPATCH' });
+                      }}
+                      onMouseLeave={() => setHoveredBreakdown(null)}
+                      className={`border border-black px-3 py-1 text-right bg-[#e2efda] font-bold transition-colors ${row.despatch > 0 ? 'text-red-700 cursor-help hover:bg-red-50' : 'text-gray-400'}`}
+                    >
                       {row.despatch > 0 ? `-${row.despatch.toLocaleString()}` : '-'}
                     </td>
                     <td className="border border-black px-3 py-1 text-right font-bold bg-[#e2efda] text-black">
@@ -316,6 +337,36 @@ export const FinishedGoodsStock: React.FC<FinishedGoodsStockProps> = ({ records 
           </table>
         </div>
       </div>
+
+      {/* FLOAT BREAKDOWN TOOLTIP */}
+      {hoveredBreakdown && (
+        <div 
+          className="fixed z-[100] bg-white border border-gray-200 shadow-2xl rounded-lg overflow-hidden animate-fadeIn min-w-[200px]"
+          style={{ left: hoveredBreakdown.x + 10, top: hoveredBreakdown.y }}
+        >
+          <div className={`px-3 py-1 text-[10px] font-black uppercase text-white ${
+            hoveredBreakdown.type === 'PRODUCTION' ? 'bg-blue-600' :
+            hoveredBreakdown.type === 'RETURN' ? 'bg-orange-600' : 'bg-red-600'
+          }`}>
+            {hoveredBreakdown.type} Breakdown
+          </div>
+          <div className="p-2 space-y-1">
+             {hoveredBreakdown.data.map((b, i) => (
+               <div key={i} className="flex justify-between items-center text-[11px] border-b border-gray-50 last:border-0 pb-1">
+                  <div>
+                    <span className="font-bold text-gray-700">{b.reference}</span>
+                    {b.info && <span className="block text-[9px] text-gray-400 truncate w-32">{b.info}</span>}
+                  </div>
+                  <span className={`font-mono font-bold ${
+                    hoveredBreakdown.type === 'DESPATCH' ? 'text-red-600' : 'text-green-600'
+                  }`}>
+                    {hoveredBreakdown.type === 'DESPATCH' ? '-' : '+'}{b.qty.toLocaleString()}
+                  </span>
+               </div>
+             ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
