@@ -4,7 +4,7 @@ import { ProductionRecord, SalesOrder, StockTransaction, PackingStockItem } from
 import { ClipboardList, AlertTriangle, CheckCircle2, Factory, Package, ArrowRight, User, TrendingUp, Info, Printer, Eye, X, Calendar, Box, Layers, Gauge, ToggleLeft, ToggleRight } from 'lucide-react';
 import { getStockTransactions } from '../services/storageService';
 
-// Master Data required for calculations
+// Master Data synchronized with FinishedGoodsStock for 100% consistency
 const MASTER_FG_OPENING = [
   { product: 'SPARKWELD 6013', size: '2.6 x 350', opening: 2214 },
   { product: 'SPARKWELD 6013', size: '3.2 x 350', opening: 4204 },
@@ -15,8 +15,48 @@ const MASTER_FG_OPENING = [
   { product: 'SPARKWELD 7018', size: '3.2 X 350', opening: 725 },
   { product: 'SPARKWELD 7018', size: '3.2 x 450', opening: 2265 },
   { product: 'SPARKWELD 7018', size: '4.0 X 350', opening: 2220 },
+  { product: 'SPARKWELD 7018', size: '4.0 x 450', opening: 0 },
   { product: 'SPARKWELD 7018', size: '5.0 x 350', opening: 235 },
   { product: 'SPARKWELD 7018', size: '5.0 x 450', opening: 135 },
+  { product: 'SPARKWELD 7018-1', size: '2.5 x 350', opening: 0 },
+  { product: 'SPARKWELD 7018-1', size: '3.2 x 350', opening: 0 },
+  { product: 'SPARKWELD 7018-1', size: '3.2 X 450', opening: 15 },
+  { product: 'SPARKWELD 7018-1', size: '4.0 X 350', opening: 265 },
+  { product: 'SPARKWELD 7018-1', size: '4.0 X 450', opening: 35 },
+  { product: 'SPARKWELD 7018-1', size: '5.0 X 350', opening: 0 },
+  { product: 'SPARKWELD 7018-1', size: '5.0 X 450', opening: 0 },
+  { product: 'VACUUM 7018', size: '2.5 X 350', opening: 0 },
+  { product: 'VACUUM 7018', size: '3.2 X 350', opening: 40 },
+  { product: 'VACUUM 7018', size: '4.0 X 350', opening: 154 },
+  { product: 'VACUUM 7018', size: '5.0 X 350', opening: 2 },
+  { product: 'VACUUM 7018-1', size: '2.5 X 350', opening: 532 },
+  { product: 'VACUUM 7018-1', size: '3.2 X 350', opening: 298 },
+  { product: 'VACUUM 7018-1', size: '4.0 X 350', opening: 8 },
+  { product: 'SPARKWELD Ni', size: '2.5 x 350', opening: 0 },
+  { product: 'SPARKWELD Ni', size: '3.2 x 350', opening: 268 },
+  { product: 'SPARKWELD Ni', size: '4.0 x 350', opening: 15 },
+  { product: 'SPARKWELD NiFe', size: '2.5 x 350', opening: 0 },
+  { product: 'SPARKWELD NiFe', size: '3.2 x 350', opening: 156 },
+  { product: 'SPARKWELD NiFe', size: '4.0 x 350', opening: 93 },
+  { product: 'VACUUM 8018-C3', size: '2.5 x 350', opening: 2 },
+  { product: 'VACUUM 8018-C3', size: '3.2 x 350', opening: 2834 },
+  { product: 'VACUUM 8018-C3', size: '4.0 x 350', opening: 534 },
+  { product: 'SPARKWELD 8018-C3', size: '2.5 x 350', opening: 0 },
+  { product: 'SPARKWELD 8018-C3', size: '3.2 x 350', opening: 0 },
+  { product: 'SPARKWELD 8018-C3', size: '4.0 x 350', opening: 0 },
+  { product: 'SPARKWELD 7024', size: '2.6 x 350', opening: 0 },
+  { product: 'SPARKWELD 7024', size: '3.2 x 350', opening: 156 },
+  { product: 'SPARKWELD 7024', size: '4.0 x 450', opening: 880 },
+  { product: 'SPARKWELD 7024', size: '5.0 x 350', opening: 0 },
+  { product: 'VACUUM 8018-B2', size: '2.5 x 350', opening: 0 },
+  { product: 'VACUUM 8018-B2', size: '3.2 x 350', opening: 318 },
+  { product: 'VACUUM 8018-B2', size: '4.0 x 350', opening: 106 },
+  { product: 'VACUUM 10018-M', size: '3.2 x 350', opening: 92 },
+  { product: 'VACUUM 10018-G', size: '3.2 x 350', opening: 0 },
+  { product: 'VACUUM 10018-D2', size: '4.0 x 350', opening: 30 },
+  { product: 'VACUUM 8018-G', size: '2.5 x 350', opening: 106 },
+  { product: 'VACUUM 8018-G', size: '3.2 x 350', opening: 86 },
+  { product: 'VACUUM 8018-G', size: '4.0 x 350', opening: 284 },
 ];
 
 const MASTER_PACKING_LIST: PackingStockItem[] = [
@@ -299,7 +339,8 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
                         ))
                       ) : (
                         order.items.map((item, iIdx) => {
-                           const available = fgStock.get(`${item.productName.toLowerCase().replace(/\s/g, '')}|${item.size.toLowerCase().replace(/\s/g, '')}`) || 0;
+                           const key = `${item.productName.toLowerCase().replace(/\s/g, '')}|${item.size.toLowerCase().replace(/\s/g, '')}`;
+                           const available = fgStock.get(key) || 0;
                            const isItemReady = available >= item.calculatedWeightKg;
                            return (
                              <div key={iIdx} className="flex justify-between text-[10px] font-mono border-b border-dotted border-gray-300 text-black py-0.5 last:border-0">
