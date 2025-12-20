@@ -272,7 +272,6 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
 
     let text = `*Sales Order Details* 📦\n`;
     text += `Customer: ${order.customerName}\n`;
-    text += `Order Date: ${fmt(order.orderDate)}\n`;
     text += `Mobile: ${order.mobileNumber}\n`;
     text += `Sales Person: ${order.salesPerson}\n`;
     text += `City: ${order.city}\n`;

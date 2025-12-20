@@ -112,7 +112,6 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
 
     let text = `*Sales Order Details* 📦\n`;
     text += `Customer: ${order.customerName}\n`;
-    text += `Order Date: ${fmt(order.orderDate)}\n`;
     text += `Mobile: ${order.mobileNumber}\n`;
     text += `Sales Person: ${order.salesPerson}\n`;
     text += `City: ${order.city}\n`;
@@ -277,20 +276,20 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
             </button>
              <button 
               onClick={() => handleBulkStatusUpdate('Dispatched')}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-50 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
             >
               <Truck size={16} /> Dispatched
             </button>
             <button 
               onClick={() => handleBulkStatusUpdate('Delivered')}
-              className="px-4 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+              className="px-4 py-2 bg-green-600 hover:bg-green-50 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
             >
               <CheckCircle size={16} /> Delivered
             </button>
             <div className="w-px bg-indigo-700 mx-2 hidden md:block"></div>
             <button 
               onClick={handleBulkDelete}
-              className="px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+              className="px-4 py-2 bg-red-600 hover:bg-red-50 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
             >
               <Trash2 size={16} /> Delete
             </button>
