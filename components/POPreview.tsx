@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { SalesOrder } from '../types';
 import { Factory, Printer, X } from 'lucide-react';
@@ -22,15 +23,8 @@ export const POPreview: React.FC<POPreviewProps> = ({ order, onClose, isDialog =
      return (
         <button 
            onClick={() => {
-              // Create a temporary full screen view for printing
-              const newWindow = window.open('', '_blank');
-              if (newWindow) {
-                 // In a real app we'd probably render this component in the new window or navigate to a print route.
-                 // For now, let's just trigger the print view in the current window by closing the dialog logic briefly or using a portal.
-                 // Actually, simpler: Just show the overlay mode.
-                 onClose(); // This is a hacky prop usage, assuming 'onClose' here meant 'trigger open'. 
-                 // Let's rely on the parent to mount this component in full screen mode.
-              }
+              // In full screen mode via parent component
+              onClose(); 
            }}
            className={ButtonClass}
         >
@@ -79,7 +73,7 @@ export const POPreview: React.FC<POPreviewProps> = ({ order, onClose, isDialog =
           <div className="text-right">
             <h2 className="text-2xl font-bold text-gray-400 uppercase">Proforma Invoice</h2>
             <p className="text-gray-800 font-mono font-bold text-lg mt-2">#{order.poNumber || order.id.slice(0, 8).toUpperCase()}</p>
-            <p className="text-gray-500 text-sm">Date: {order.orderDate}</p>
+            <p className="text-gray-500 text-sm">Order Date: {order.orderDate}</p>
           </div>
         </div>
 
@@ -96,6 +90,7 @@ export const POPreview: React.FC<POPreviewProps> = ({ order, onClose, isDialog =
              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Order Details</h3>
              <p className="text-gray-600"><span className="font-medium text-gray-800">Sales Rep:</span> {order.salesPerson}</p>
              <p className="text-gray-600"><span className="font-medium text-gray-800">PO Ref:</span> {order.poNumber}</p>
+             <p className="text-gray-600"><span className="font-medium text-gray-800">PO Date:</span> {order.poDate}</p>
              <p className="text-gray-600"><span className="font-medium text-gray-800">Status:</span> {order.status}</p>
           </div>
         </div>

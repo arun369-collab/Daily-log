@@ -109,6 +109,7 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
     text += `City: ${order.city}\n`;
     if(order.mapLink) text += `📍 ${order.mapLink}\n`;
     text += `PO No: ${order.poNumber}\n`;
+    text += `PO Date: ${order.poDate}\n`; // Added PO Date
     if(order.poFileName) text += `PO File: ${order.poFileName} (See Attachment)\n`;
     
     text += `\n*Items:* \n`;

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { SalesOrder, SalesOrderItem, Customer, UserRole } from '../types';
-import { Save, User, MapPin, Mail, Phone, FileText, Upload, Plus, Trash2, ShoppingCart, Package, Info, AlertCircle, CheckCircle, MessageCircle, ArrowRight, Search, Copy, Share2, X, Briefcase } from 'lucide-react';
+import { Save, User, MapPin, Mail, Phone, FileText, Upload, Plus, Trash2, ShoppingCart, Package, Info, AlertCircle, CheckCircle, MessageCircle, ArrowRight, Search, Copy, Share2, X, Briefcase, Calendar } from 'lucide-react';
 import { getFamilies, getTypesForFamily, getProductDef, ProductDefinition } from '../data/products';
 import { getCustomers, saveCustomer } from '../services/storageService';
 import { POPreview } from './POPreview';
@@ -45,6 +45,7 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
   const [city, setCity] = useState('');
   const [mapLink, setMapLink] = useState('');
   const [poNumber, setPoNumber] = useState('');
+  const [poDate, setPoDate] = useState(new Date().toISOString().split('T')[0]);
   
   // File Upload State
   const [poFileName, setPoFileName] = useState('');
@@ -90,6 +91,7 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
       setCity(initialOrder.city);
       setMapLink(initialOrder.mapLink);
       setPoNumber(initialOrder.poNumber);
+      setPoDate(initialOrder.poDate || new Date().toISOString().split('T')[0]);
       setPoFileName(initialOrder.poFileName || '');
       setPoFileData(initialOrder.poFileData || null);
       setCartItems(initialOrder.items);
@@ -232,6 +234,7 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
       city,
       mapLink,
       poNumber: poNumber || 'N/A',
+      poDate: poDate, // New field
       poFileName: poFileName || undefined,
       poFileData: poFileData || undefined,
       items: cartItems,
@@ -266,6 +269,7 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
     text += `City: ${order.city}\n`;
     if(order.mapLink) text += `📍 ${order.mapLink}\n`;
     text += `PO No: ${order.poNumber}\n`;
+    text += `PO Date: ${order.poDate}\n`; // Added PO Date
     if(order.poFileName) text += `PO File: ${order.poFileName} (See Attachment)\n`;
     
     text += `\n*Items:* \n`;
@@ -563,13 +567,30 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
                <FileText size={18} /> PO Details
              </h3>
              <div className="space-y-3">
-                <input 
-                  type="text" 
-                  placeholder="PO Number" 
-                  value={poNumber}
-                  onChange={e => setPoNumber(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm uppercase font-mono"
-                />
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="relative">
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">PO Number</label>
+                    <input 
+                      type="text" 
+                      placeholder="PO Number" 
+                      value={poNumber}
+                      onChange={e => setPoNumber(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm uppercase font-mono"
+                    />
+                  </div>
+                  <div className="relative">
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">PO Date</label>
+                    <div className="relative">
+                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                      <input 
+                        type="date" 
+                        value={poDate}
+                        onChange={e => setPoDate(e.target.value)}
+                        className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
                 
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:bg-gray-100 transition-colors cursor-pointer relative">
                   <input 

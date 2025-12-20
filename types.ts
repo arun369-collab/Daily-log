@@ -47,6 +47,7 @@ export interface SalesOrder {
   
   // PO Details
   poNumber: string;
+  poDate: string; // New field
   poFileName?: string; 
   poFileData?: string; // Base64 Data URL for the file
   
