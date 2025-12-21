@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { SalesOrder, UserRole, ProductionRecord } from '../types';
-import { ShoppingBag, MapPin, FileText, CheckCircle, Clock, Eye, X, MessageCircle, Copy, Share2, Printer, ExternalLink, Pencil, Truck, Package, RefreshCw, ClipboardList, Plus, Trash2, AlertCircle, CheckCircle2, Box, RotateCcw } from 'lucide-react';
+import { ShoppingBag, MapPin, FileText, CheckCircle, Clock, Eye, X, MessageCircle, Copy, Share2, Printer, ExternalLink, Pencil, Truck, Package, RefreshCw, ClipboardList, Plus, Trash2, AlertCircle, CheckCircle2, Box, RotateCcw, Sparkles } from 'lucide-react';
 import { POPreview } from './POPreview';
 import { DeliveryLedger } from './DeliveryLedger';
 import { saveSalesOrder, deleteSalesOrder, deleteSalesOrders } from '../services/storageService';
@@ -335,7 +335,15 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
                   <tr key={order.id} className={selectedIds.has(order.id) ? 'bg-indigo-50/50' : ''}>
                     {userRole === 'admin' && <td className="px-4 py-4 text-center"><input type="checkbox" checked={selectedIds.has(order.id)} onChange={() => toggleSelection(order.id)} className="rounded" /></td>}
                     <td className="px-6 py-4 whitespace-nowrap">{order.orderDate.split('-').reverse().join('-')}</td>
-                    <td className="px-6 py-4"><div className="font-bold">{order.customerName}</div><div className="text-xs text-gray-500">{order.city}</div></td>
+                    <td className="px-6 py-4">
+                       <div className="flex items-center gap-2">
+                          <div className="font-bold">{order.customerName}</div>
+                          {order.isProspective && (
+                             <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase bg-purple-100 text-purple-700 border border-purple-200">Prospective</span>
+                          )}
+                       </div>
+                       <div className="text-xs text-gray-500">{order.city}</div>
+                    </td>
                     {userRole === 'admin' && (
                       <td className="px-6 py-4 text-center">
                         <span className={`px-2 py-1 rounded text-[10px] font-black uppercase ${pack?.status === 'Ready' ? 'bg-emerald-100 text-emerald-700' : pack?.status === 'Partial' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>
@@ -366,7 +374,12 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ orders, producti
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
             <div className="px-6 py-4 border-b bg-gray-50 flex justify-between items-center">
-              <div><h3 className="text-lg font-bold">Order Details</h3><p className="text-sm text-gray-500">PO: {selectedOrder.poNumber}</p></div>
+              <div>
+                <h3 className="text-lg font-bold flex items-center gap-2">
+                   Order Details {selectedOrder.isProspective && <span className="px-2 py-0.5 bg-purple-600 text-white text-[10px] rounded uppercase">Prospective</span>}
+                </h3>
+                <p className="text-sm text-gray-500">PO: {selectedOrder.poNumber}</p>
+              </div>
               <button onClick={() => setSelectedOrder(null)} className="p-2 hover:bg-gray-200 rounded-full"><X size={20} /></button>
             </div>
             <div className="p-6 overflow-y-auto">

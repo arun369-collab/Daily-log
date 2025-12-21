@@ -61,6 +61,7 @@ export interface SalesOrder {
   grandTotal: number;
   
   status: 'Pending' | 'Processing' | 'Dispatched' | 'Delivered';
+  isProspective?: boolean; // Flag for tentative/forecasted orders
 }
 
 export interface Customer {

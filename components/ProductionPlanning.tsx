@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { ProductionRecord, SalesOrder, StockTransaction, PackingStockItem } from '../types';
-import { ClipboardList, AlertTriangle, CheckCircle2, Factory, Package, ArrowRight, User, TrendingUp, Info, Printer, Eye, X, Calendar, Box, Layers, Gauge, ToggleLeft, ToggleRight } from 'lucide-react';
+import { ClipboardList, AlertTriangle, CheckCircle2, Factory, Package, ArrowRight, User, TrendingUp, Info, Printer, Eye, X, Calendar, Box, Layers, Gauge, ToggleLeft, ToggleRight, Sparkles } from 'lucide-react';
 import { getStockTransactions } from '../services/storageService';
 
 // Master Data synchronized with FinishedGoodsStock for 100% consistency
@@ -80,6 +80,7 @@ interface ProductionPlanningProps {
 export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records, orders }) => {
   const [viewMode, setViewMode] = useState<'dashboard' | 'print'>('dashboard');
   const [includeCapacity, setIncludeCapacity] = useState(true);
+  const [includeProspective, setIncludeProspective] = useState(true);
   const transactions = useMemo(() => getStockTransactions(), []);
 
   const formatDDMMYYYY = (dateStr: string) => {
@@ -193,8 +194,17 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
   }, [packingStock]);
 
   const analysis = useMemo(() => {
-    const pending = orders.filter(o => o.status === 'Pending' || o.status === 'Processing')
-                          .sort((a, b) => new Date(a.orderDate).getTime() - new Date(b.orderDate).getTime());
+    const normalize = (str: string) => str.toLowerCase().replace(/\s/g, '');
+    
+    // Filter pending and potentially prospective orders
+    const pending = orders.filter(o => {
+      const isFirmPending = o.status === 'Pending' || o.status === 'Processing';
+      if (includeProspective) {
+        return isFirmPending || (o.isProspective && o.status !== 'Delivered' && o.status !== 'Dispatched');
+      }
+      return isFirmPending && !o.isProspective;
+    }).sort((a, b) => new Date(a.orderDate).getTime() - new Date(b.orderDate).getTime());
+
     const shortfallMap = new Map<string, { productName: string, size: string, totalNeeded: number, available: number, shortfall: number, firstOrderDate: string }>();
     const orderDetails: { order: SalesOrder, isReady: boolean, shortfallItems: any[] }[] = [];
 
@@ -204,26 +214,35 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
       order.items.forEach(item => {
         const key = `${normalize(item.productName)}|${normalize(item.size)}`;
         const available = fgStock.get(key) || 0;
+        
+        // We track the needed quantity regardless of readiness to calculate total production plan
+        if (!shortfallMap.has(key)) {
+          shortfallMap.set(key, {
+            productName: item.productName,
+            size: item.size,
+            totalNeeded: 0,
+            available,
+            shortfall: 0,
+            firstOrderDate: order.poDate || order.orderDate
+          });
+        }
+        
+        const s = shortfallMap.get(key)!;
+        s.totalNeeded += item.calculatedWeightKg;
+        s.shortfall = Math.max(0, s.totalNeeded - available);
+
         if (available < item.calculatedWeightKg) {
           orderReady = false;
           orderShortfalls.push({ ...item, available });
-          if (!shortfallMap.has(key)) {
-            shortfallMap.set(key, {
-              productName: item.productName,
-              size: item.size,
-              totalNeeded: 0,
-              available,
-              shortfall: 0,
-              firstOrderDate: order.poDate || order.orderDate
-            });
-          }
-          const s = shortfallMap.get(key)!;
-          s.totalNeeded += item.calculatedWeightKg;
-          s.shortfall = Math.max(0, s.totalNeeded - available);
         }
       });
       orderDetails.push({ order, isReady: orderReady, shortfallItems: orderShortfalls });
     });
+
+    // Remove items from priorities that have 0 shortfall
+    const priorityList = Array.from(shortfallMap.values())
+      .filter(p => p.shortfall > 0)
+      .sort((a, b) => new Date(a.firstOrderDate).getTime() - new Date(b.firstOrderDate).getTime());
 
     const materialAlerts: { name: string, stock: number, unit: string }[] = [];
     MASTER_PACKING_LIST.forEach(m => {
@@ -234,11 +253,11 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
     });
 
     return {
-      priorities: Array.from(shortfallMap.values()).sort((a, b) => new Date(a.firstOrderDate).getTime() - new Date(b.firstOrderDate).getTime()),
+      priorities: priorityList,
       orderDetails,
       materialAlerts
     };
-  }, [fgStock, packingStock, orders]);
+  }, [fgStock, packingStock, orders, includeProspective]);
 
   const handlePrint = () => {
     window.print();
@@ -263,7 +282,7 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
           <div className="border-b-2 border-black pb-4 mb-6 flex justify-between items-end">
             <div>
               <h1 className="text-3xl font-black uppercase tracking-tighter text-black">Production Planning Report</h1>
-              <p className="text-sm font-medium text-gray-600">Based on Active Sales Orders & Live Inventory</p>
+              <p className="text-sm font-medium text-gray-600">Based on Active {includeProspective ? '& Prospective' : ''} Orders</p>
             </div>
             <div className="text-right">
               <p className="font-bold text-lg text-black">Date: {formatDDMMYYYY(new Date().toISOString().split('T')[0])}</p>
@@ -273,7 +292,7 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
 
           {/* Section 1: Priorities */}
           <div className="mb-8 break-inside-avoid">
-            <h3 className="bg-black text-white px-3 py-1 text-sm font-bold uppercase mb-3">Priority 01: Production Queue (FIFO PO Date)</h3>
+            <h3 className="bg-black text-white px-3 py-1 text-sm font-bold uppercase mb-3">Priority 01: Production Queue (FIFO Required)</h3>
             <table className="w-full border-collapse border border-black text-xs">
                <thead>
                  <tr className="bg-gray-100">
@@ -324,10 +343,13 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
             <h3 className="bg-black text-white px-3 py-1 text-sm font-bold uppercase mb-3">Priority 03: Sales Order Fulfillment Breakdown</h3>
             <div className="space-y-4">
               {analysis.orderDetails.map(({ order, isReady, shortfallItems }, idx) => (
-                <div key={idx} className={`border border-black p-3 break-inside-avoid ${isReady ? 'bg-gray-50' : 'bg-white'}`}>
+                <div key={idx} className={`border border-black p-3 break-inside-avoid ${order.isProspective ? 'border-dashed border-gray-400 bg-purple-50/20' : (isReady ? 'bg-gray-50' : 'bg-white')}`}>
                    <div className="flex justify-between items-start border-b border-black pb-1 mb-2">
                       <div>
-                        <span className="font-black text-sm uppercase text-black">{order.customerName}</span>
+                        <span className="font-black text-sm uppercase text-black">
+                          {order.isProspective && <span className="mr-2 text-[10px] bg-purple-600 text-white px-1 py-0.5 rounded">PROSPECTIVE</span>}
+                          {order.customerName}
+                        </span>
                         <span className="ml-2 text-[10px] text-gray-600">PO: {order.poNumber} | PO Date: {formatDDMMYYYY(order.poDate || order.orderDate)}</span>
                       </div>
                       <div className={`px-2 py-0.5 rounded text-[10px] font-bold border border-black ${isReady ? 'bg-black text-white' : 'text-black'}`}>
@@ -382,7 +404,7 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
             <div className="p-3 bg-amber-50 text-amber-600 rounded-lg"><ClipboardList size={24}/></div>
             <div>
-                <p className="text-sm font-medium text-gray-500">Pending Orders</p>
+                <p className="text-sm font-medium text-gray-500">Filtered Orders</p>
                 <h3 className="text-2xl font-bold text-gray-900">{analysis.orderDetails.length}</h3>
             </div>
           </div>
@@ -403,25 +425,41 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
         </div>
 
         <div className="flex flex-col gap-3 w-full md:w-auto">
-          {/* Include Capacity Toggle Tab */}
-          <div className="flex bg-white p-1 rounded-xl border border-gray-200 shadow-sm">
-             <button 
-              onClick={() => setIncludeCapacity(true)}
-              className={`flex-1 md:px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${includeCapacity ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}
-             >
-               <Layers size={14}/> With Capacity
-             </button>
-             <button 
-              onClick={() => setIncludeCapacity(false)}
-              className={`flex-1 md:px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${!includeCapacity ? 'bg-gray-800 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}
-             >
-               <Layers size={14}/> Orders Only
-             </button>
+          {/* Prospective & Capacity Toggle Panel */}
+          <div className="flex flex-col bg-white p-2 rounded-xl border border-gray-200 shadow-sm gap-2">
+             <div className="flex p-1 bg-gray-50 rounded-lg">
+                <button 
+                  onClick={() => setIncludeProspective(true)}
+                  className={`flex-1 px-3 py-1.5 rounded-md text-[10px] font-bold uppercase transition-all flex items-center justify-center gap-1.5 ${includeProspective ? 'bg-purple-600 text-white shadow-sm' : 'text-gray-400 hover:bg-gray-100'}`}
+                >
+                  <Sparkles size={12}/> + Prospective
+                </button>
+                <button 
+                  onClick={() => setIncludeProspective(false)}
+                  className={`flex-1 px-3 py-1.5 rounded-md text-[10px] font-bold uppercase transition-all flex items-center justify-center gap-1.5 ${!includeProspective ? 'bg-gray-800 text-white shadow-sm' : 'text-gray-400 hover:bg-gray-100'}`}
+                >
+                  Firm Only
+                </button>
+             </div>
+             <div className="flex p-1 bg-gray-50 rounded-lg">
+                <button 
+                  onClick={() => setIncludeCapacity(true)}
+                  className={`flex-1 px-3 py-1.5 rounded-md text-[10px] font-bold uppercase transition-all flex items-center justify-center gap-1.5 ${includeCapacity ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-400 hover:bg-gray-100'}`}
+                >
+                  <Layers size={12}/> Capacity
+                </button>
+                <button 
+                  onClick={() => setIncludeCapacity(false)}
+                  className={`flex-1 px-3 py-1.5 rounded-md text-[10px] font-bold uppercase transition-all flex items-center justify-center gap-1.5 ${!includeCapacity ? 'bg-gray-800 text-white shadow-sm' : 'text-gray-400 hover:bg-gray-100'}`}
+                >
+                  Simple View
+                </button>
+             </div>
           </div>
           
           <button 
             onClick={() => setViewMode('print')}
-            className="w-full px-6 py-4 bg-gray-900 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-xl hover:bg-black transition-all group"
+            className="w-full px-6 py-3 bg-gray-900 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-xl hover:bg-black transition-all group"
           >
             <Printer size={20} className="group-hover:scale-110 transition-transform" /> 
             Planning Report
@@ -447,7 +485,7 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
                          <div className="flex justify-between items-start mb-2">
                             <span className="text-[10px] font-bold text-gray-400 uppercase">{item.line}</span>
                             <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${item.capacityKg > 5000 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                              {item.capacityKg > 0 ? 'Packing Possible' : 'Material Empty'}
+                              {item.capacityKg > 0 ? 'Possible' : 'Empty'}
                             </span>
                          </div>
                          <div className="text-2xl font-black text-gray-900">{(item.capacityKg / 1000).toFixed(1)} <span className="text-sm font-normal text-gray-400 uppercase">Tons</span></div>
@@ -456,7 +494,7 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
                       
                       <div className="mt-4 pt-4 border-t border-gray-200">
                          <div className="flex justify-between items-center text-[10px] mb-1">
-                            <span className="text-gray-400">Limiting Factor:</span>
+                            <span className="text-gray-400">Bottleneck:</span>
                             <span className="font-bold text-red-600 uppercase flex items-center gap-1">
                               <AlertTriangle size={10}/> {item.bottleneck}
                             </span>
@@ -482,7 +520,9 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
             <h3 className="font-bold flex items-center gap-2">
               <TrendingUp size={18} /> Production Priority (FIFO PO Date)
             </h3>
-            <span className="text-xs bg-white/20 px-2 py-0.5 rounded font-bold uppercase tracking-wider">FIFO Required</span>
+            <span className="text-xs bg-white/20 px-2 py-0.5 rounded font-bold uppercase tracking-wider">
+              {includeProspective ? 'Total Demand' : 'Firm Demand'}
+            </span>
           </div>
           <div className="p-0 overflow-y-auto max-h-[600px]">
              <table className="w-full text-sm text-left">
@@ -534,18 +574,21 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
           <div className="px-6 py-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
             <h3 className="font-bold text-gray-700 flex items-center gap-2">
-              <User size={18} /> Sales Fulfillment Details
+              <User size={18} /> fulfillment Checklist
             </h3>
-            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Live Checklist</div>
+            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Live Inventory Match</div>
           </div>
           <div className="p-0 overflow-y-auto max-h-[600px]">
              <div className="divide-y divide-gray-100">
                 {analysis.orderDetails.map(({ order, isReady, shortfallItems }, idx) => (
-                  <div key={idx} className={`p-6 transition-colors ${isReady ? 'bg-green-50/30' : 'bg-white'}`}>
+                  <div key={idx} className={`p-6 transition-colors ${order.isProspective ? 'bg-purple-50/30' : (isReady ? 'bg-green-50/30' : 'bg-white')}`}>
                      <div className="flex justify-between items-start mb-3">
                         <div>
                            <div className="flex items-center gap-2">
-                              <h4 className="font-bold text-gray-900">{order.customerName}</h4>
+                              <h4 className="font-bold text-gray-900">
+                                {order.isProspective && <span className="mr-2 text-[8px] bg-purple-600 text-white px-1 py-0.5 rounded font-black tracking-tighter uppercase">Tentative</span>}
+                                {order.customerName}
+                              </h4>
                               <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-tighter ${isReady ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
                                 {isReady ? 'Ready' : 'Shortage'}
                               </span>
@@ -553,12 +596,12 @@ export const ProductionPlanning: React.FC<ProductionPlanningProps> = ({ records,
                            <p className="text-xs text-gray-500 mt-0.5">PO: {order.poNumber} | PO Date: {formatDDMMYYYY(order.poDate || order.orderDate)}</p>
                         </div>
                         <div className="text-right">
-                           <div className="text-sm font-bold text-indigo-600">{order.totalWeightKg.toLocaleString()} Kg</div>
+                           <div className={`text-sm font-bold ${order.isProspective ? 'text-purple-600' : 'text-indigo-600'}`}>{order.totalWeightKg.toLocaleString()} Kg</div>
                            <div className="text-[10px] text-gray-400 uppercase font-bold">{order.items.length} Lines</div>
                         </div>
                      </div>
                      
-                     <div className={`p-3 rounded-lg border mt-2 ${isReady ? 'bg-green-100/30 border-green-200' : 'bg-red-50 border-red-100'}`}>
+                     <div className={`p-3 rounded-lg border mt-2 ${order.isProspective ? 'border-purple-200 bg-purple-50/50' : (isReady ? 'bg-green-100/30 border-green-200' : 'bg-red-50 border-red-100')}`}>
                         <div className="space-y-1.5">
                            {order.items.map((item, iIdx) => {
                              const key = `${normalize(item.productName)}|${normalize(item.size)}`;

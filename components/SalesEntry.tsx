@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { SalesOrder, SalesOrderItem, Customer, UserRole } from '../types';
-import { Save, User, MapPin, Mail, Phone, FileText, Upload, Plus, Trash2, ShoppingCart, Package, Info, AlertCircle, CheckCircle, MessageCircle, ArrowRight, Search, Copy, Share2, X, Briefcase, Calendar } from 'lucide-react';
+import { Save, User, MapPin, Mail, Phone, FileText, Upload, Plus, Trash2, ShoppingCart, Package, Info, AlertCircle, CheckCircle, MessageCircle, ArrowRight, Search, Copy, Share2, X, Briefcase, Calendar, Sparkles } from 'lucide-react';
 import { getFamilies, getTypesForFamily, getProductDef, ProductDefinition } from '../data/products';
 import { getCustomers, saveCustomer } from '../services/storageService';
 import { POPreview } from './POPreview';
@@ -46,6 +46,7 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
   const [mapLink, setMapLink] = useState('');
   const [poNumber, setPoNumber] = useState('');
   const [poDate, setPoDate] = useState(new Date().toISOString().split('T')[0]);
+  const [isProspective, setIsProspective] = useState(false);
   
   // File Upload State
   const [poFileName, setPoFileName] = useState('');
@@ -95,6 +96,7 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
       setPoFileName(initialOrder.poFileName || '');
       setPoFileData(initialOrder.poFileData || null);
       setCartItems(initialOrder.items);
+      setIsProspective(initialOrder.isProspective || false);
       
       const sp = initialOrder.salesPerson;
       setSelectedSalesPerson(sp);
@@ -242,7 +244,8 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
       subTotal: subTotal,
       vatAmount: vatAmount,
       grandTotal: grandTotal,
-      status: initialOrder ? initialOrder.status : 'Pending'
+      status: initialOrder ? initialOrder.status : 'Pending',
+      isProspective: isProspective
     };
 
     // Auto-save customer if new or updated
@@ -270,7 +273,7 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
       return `${pts[2]} ${mos[parseInt(pts[1]) - 1]} ${pts[0]}`;
     };
 
-    let text = `*Sales Order Details* 📦\n`;
+    let text = order.isProspective ? `*Prospective Order Details (Tentative)* 🔮\n` : `*Sales Order Details* 📦\n`;
     text += `Customer: ${order.customerName}\n`;
     text += `Mobile: ${order.mobileNumber}\n`;
     text += `Sales Person: ${order.salesPerson}\n`;
@@ -306,7 +309,7 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
     const text = generateShareText(submittedOrder);
     
     const shareData: any = {
-      title: 'New Sales Order',
+      title: submittedOrder.isProspective ? 'Prospective Order' : 'New Sales Order',
       text: text,
     };
 
@@ -384,12 +387,14 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn">
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-          <div className="bg-green-600 p-6 text-center">
+          <div className={submittedOrder.isProspective ? "bg-purple-600 p-6 text-center" : "bg-green-600 p-6 text-center"}>
             <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
-              <CheckCircle className="text-green-600 w-10 h-10" />
+              {submittedOrder.isProspective ? <Sparkles className="text-purple-600 w-10 h-10" /> : <CheckCircle className="text-green-600 w-10 h-10" />}
             </div>
-            <h2 className="text-2xl font-bold text-white">{initialOrder ? 'Order Updated!' : 'Order Placed!'}</h2>
-            <p className="text-green-100">The order has been successfully saved.</p>
+            <h2 className="text-2xl font-bold text-white">
+              {initialOrder ? 'Order Updated!' : submittedOrder.isProspective ? 'Prospective Saved!' : 'Order Placed!'}
+            </h2>
+            <p className="text-white/80">{submittedOrder.isProspective ? 'Tentative demand recorded for planning.' : 'The order has been successfully saved.'}</p>
           </div>
 
           <div className="p-6 space-y-4">
@@ -451,16 +456,18 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
 
   return (
     <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-md overflow-hidden border border-gray-200 pb-20 md:pb-0">
-      <div className="bg-indigo-600 px-6 py-4 flex justify-between items-center">
+      <div className={`${isProspective ? 'bg-purple-600' : 'bg-indigo-600'} px-6 py-4 flex justify-between items-center transition-colors`}>
         <div>
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <ShoppingCart className="text-indigo-200" /> {initialOrder ? 'Edit Sales Order' : 'New Sales Order'}
+            <ShoppingCart className={isProspective ? 'text-purple-200' : 'text-indigo-200'} /> 
+            {initialOrder ? 'Edit Order' : isProspective ? 'New Prospective Order' : 'New Sales Order'}
           </h2>
-          <p className="text-indigo-100 text-sm">{initialOrder ? 'Modify order details and items' : 'Enter customer and product details'}</p>
+          <p className="text-indigo-100 text-sm">
+            {isProspective ? 'Recording tentative demand for planning purposes' : (initialOrder ? 'Modify order details and items' : 'Enter customer and product details')}
+          </p>
         </div>
-        {/* Sales Person Display (Read Only in Header) */}
         <div className="hidden md:block">
-           <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-indigo-700 text-indigo-100 text-xs font-medium border border-indigo-500">
+           <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full ${isProspective ? 'bg-purple-700 border-purple-500' : 'bg-indigo-700 border-indigo-500'} text-indigo-100 text-xs font-medium border`}>
              <Briefcase size={12} /> {userRole === 'admin' ? selectedSalesPerson : salesPersonName}
            </span>
         </div>
@@ -471,9 +478,24 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
         {/* LEFT COLUMN: Customer & PO */}
         <div className="space-y-6">
           <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
-             <h3 className="font-bold text-gray-700 flex items-center gap-2 mb-4">
-               <User size={18} /> Customer Details
-             </h3>
+             <div className="flex justify-between items-center mb-4">
+                <h3 className="font-bold text-gray-700 flex items-center gap-2">
+                  <User size={18} /> Customer Details
+                </h3>
+                {userRole === 'admin' && (
+                  <button 
+                    type="button"
+                    onClick={() => setIsProspective(!isProspective)}
+                    className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase transition-all flex items-center gap-1.5 border ${
+                      isProspective 
+                      ? 'bg-purple-100 text-purple-700 border-purple-300 shadow-inner' 
+                      : 'bg-white text-gray-400 border-gray-200 hover:border-purple-200 hover:text-purple-400'
+                    }`}
+                  >
+                    <Sparkles size={12} /> Prospective Order
+                  </button>
+                )}
+             </div>
 
              {/* ADMIN: Sales Person Selection (Moved to body for better visibility) */}
              {userRole === 'admin' && (
@@ -580,7 +602,7 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
                     <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">PO Number</label>
                     <input 
                       type="text" 
-                      placeholder="PO Number" 
+                      placeholder={isProspective ? "TENTATIVE-01" : "PO Number"} 
                       value={poNumber}
                       onChange={e => setPoNumber(e.target.value)}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm uppercase font-mono"
@@ -619,8 +641,8 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
 
         {/* RIGHT COLUMN: Product & Cart */}
         <div className="space-y-6 flex flex-col h-full">
-           <div className="bg-white p-4 rounded-xl border-2 border-indigo-100 shadow-sm">
-             <h3 className="font-bold text-indigo-900 flex items-center gap-2 mb-4">
+           <div className={`bg-white p-4 rounded-xl border-2 ${isProspective ? 'border-purple-100' : 'border-indigo-100'} shadow-sm transition-colors`}>
+             <h3 className={`font-bold ${isProspective ? 'text-purple-900' : 'text-indigo-900'} flex items-center gap-2 mb-4`}>
                <Package size={18} /> {initialOrder ? 'Add/Modify Items' : 'Add Items'}
              </h3>
              
@@ -692,7 +714,7 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
              <button 
                 onClick={handleAddItem}
                 disabled={!selectedSize || !quantityKg || !pricePerKg}
-                className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className={`w-full px-4 py-2 ${isProspective ? 'bg-purple-600 hover:bg-purple-700' : 'bg-indigo-600 hover:bg-indigo-700'} text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors`}
               >
                 <Plus size={18} /> Add to Order
               </button>
@@ -709,7 +731,7 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
            {/* Order Cart */}
            <div className="flex-1 bg-gray-50 rounded-xl border border-gray-200 flex flex-col overflow-hidden">
              <div className="p-3 bg-gray-100 border-b border-gray-200 font-bold text-gray-700 flex justify-between">
-                <span>Current Order</span>
+                <span>{isProspective ? 'Forecast Items' : 'Current Order'}</span>
                 <span>{cartItems.length} Items</span>
              </div>
              
@@ -719,7 +741,7 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
                     <div>
                       <div className="font-bold text-gray-800 text-sm">{item.productName}</div>
                       <div className="text-xs text-gray-500">{item.size}</div>
-                      <div className="text-xs font-mono mt-1 text-indigo-600">
+                      <div className={`text-xs font-mono mt-1 ${isProspective ? 'text-purple-600' : 'text-indigo-600'}`}>
                         {item.quantityCtn} CTN • {item.calculatedWeightKg} Kg • {item.pricePerKg.toFixed(2)}/kg
                       </div>
                     </div>
@@ -751,7 +773,7 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
                   <span>VAT (15%)</span>
                   <span>SAR {vatAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                 </div>
-                <div className="flex justify-between items-center font-bold text-indigo-700 text-lg pt-2 border-t border-gray-100">
+                <div className={`flex justify-between items-center font-bold ${isProspective ? 'text-purple-700' : 'text-indigo-700'} text-lg pt-2 border-t border-gray-100`}>
                   <span>Total</span>
                   <span>SAR {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                 </div>
@@ -763,9 +785,9 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({ onSave, onCancel, salesP
                   <button 
                     onClick={handleSubmit}
                     disabled={cartItems.length === 0 || !customerName}
-                    className="flex-1 bg-indigo-600 text-white py-3 rounded-lg font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    className={`flex-1 ${isProspective ? 'bg-purple-600 hover:bg-purple-700 shadow-purple-200' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200'} text-white py-3 rounded-lg font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all`}
                   >
-                    {initialOrder ? 'Update Order' : 'Place Order'} <ArrowRight size={18} />
+                    {initialOrder ? 'Update Order' : isProspective ? 'Record Prospective' : 'Place Order'} <ArrowRight size={18} />
                   </button>
                 </div>
              </div>
