@@ -24,7 +24,8 @@ import {
   Menu,
   X,
   Brain,
-  CalendarDays
+  CalendarDays,
+  Layers
 } from 'lucide-react';
 import { ViewState, ProductionRecord, UserRole, SalesOrder } from './types';
 import { getRecords, saveRecord, deleteRecord, getSalesOrders, saveSalesOrder, deleteSalesOrder, deleteSalesOrders } from './services/storageService';
@@ -45,6 +46,7 @@ import { VisualAnalytics } from './components/VisualAnalytics';
 import { FinishedGoodsStock } from './components/FinishedGoodsStock';
 import { CustomerBehaviour } from './components/CustomerBehaviour';
 import { ProductionPlanning } from './components/ProductionPlanning';
+import { RawMaterialStock } from './components/RawMaterialStock';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -279,7 +281,7 @@ function App() {
 
   const canAccess = (feature: ViewState) => {
     if (userRole === 'admin') return true;
-    if (userRole === 'yadav') return ['dashboard', 'entry', 'ledger_sheet', 'packing_stock', 'analytics', 'batches'].includes(feature);
+    if (userRole === 'yadav') return ['dashboard', 'entry', 'ledger_sheet', 'packing_stock', 'analytics', 'batches', 'raw_material'].includes(feature);
     if (userRole === 'sales') return ['sales_dashboard', 'sales_entry', 'customers', 'customer_behaviour'].includes(feature);
     return false;
   };
@@ -325,6 +327,7 @@ function App() {
           {canAccess('analytics') && <NavItem target="analytics" icon={PieChart} label="Analytics" />}
           {canAccess('entry') && <NavItem target="entry" icon={PlusCircle} label="Add Ledger Entry" />}
           {canAccess('ledger_sheet') && <NavItem target="ledger_sheet" icon={FileText} label="Daily Report" />}
+          {canAccess('raw_material') && <NavItem target="raw_material" icon={Layers} label="Raw Material" />}
           {canAccess('packing_stock') && <NavItem target="packing_stock" icon={Package} label="Packing Stock" />}
           {canAccess('finished_goods') && <NavItem target="finished_goods" icon={ClipboardList} label="Finished Goods" />}
           {canAccess('batches') && <NavItem target="batches" icon={Archive} label="Batch Registry" />}
@@ -366,6 +369,7 @@ function App() {
               {view === 'planning' && 'Production Planning'}
               {view === 'analytics' && 'Visual Analytics'}
               {view === 'entry' && (editingRecord ? (editingRecord.isReturn ? 'Edit Return Entry' : 'Edit Ledger Entry') : 'New Ledger Entry')}
+              {view === 'raw_material' && 'Raw Material Stock'}
               {view === 'packing_stock' && 'Packing Material Stock'}
               {view === 'finished_goods' && 'Finished Goods Inventory'}
               {view === 'batches' && 'Batch Registry'}
@@ -402,6 +406,7 @@ function App() {
             />
           )}
 
+          {canAccess('raw_material') && view === 'raw_material' && <RawMaterialStock />}
           {canAccess('packing_stock') && view === 'packing_stock' && <PackingStock records={displayRecords} />}
           {canAccess('finished_goods') && view === 'finished_goods' && <FinishedGoodsStock records={records} orders={salesOrders} />}
           {canAccess('batches') && view === 'batches' && <BatchRegistry records={displayRecords} />}
@@ -494,7 +499,7 @@ function App() {
          {userRole === 'admin' && (
            <>
              <MobileNavIcon target="dashboard" icon={LayoutDashboard} label="Home" />
-             <MobileNavIcon target="planning" icon={CalendarDays} label="Plan" />
+             <MobileNavIcon target="raw_material" icon={Layers} label="Raw" />
              <div className="relative -top-6">
                 <button 
                   onClick={() => { setView('entry'); setEditingRecord(null); }}
@@ -517,7 +522,7 @@ function App() {
          {userRole === 'yadav' && (
            <>
              <MobileNavIcon target="dashboard" icon={LayoutDashboard} label="Home" />
-             <MobileNavIcon target="ledger_sheet" icon={FileText} label="Report" />
+             <MobileNavIcon target="raw_material" icon={Layers} label="Raw" />
              <div className="relative -top-6">
                 <button 
                   onClick={() => { setView('entry'); setEditingRecord(null); }}
@@ -536,7 +541,7 @@ function App() {
              </button>
            </>
          )}
-
+         {/* Sales Role truncated for brevity as no changes needed there */}
          {userRole === 'sales' && (
            <>
               <MobileNavIcon target="sales_dashboard" icon={ShoppingBag} label="Orders" />
@@ -597,29 +602,16 @@ function App() {
                  </button>
                )}
 
-               {/* SALES SECTION FOR ADMIN/SALES */}
-               {(canAccess('sales_dashboard') || canAccess('sales_entry')) && (
-                  <div className="col-span-2 mt-4 mb-2">
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest px-1">Sales Management</p>
-                  </div>
-               )}
-               {canAccess('sales_dashboard') && (
-                 <button onClick={() => { setView('sales_dashboard'); setIsMobileMenuOpen(false); }} className="flex flex-col items-center p-4 bg-indigo-50 rounded-2xl text-indigo-700">
-                    <ShoppingBag size={32} className="mb-2" />
-                    <span className="text-sm font-bold">My Orders</span>
-                 </button>
-               )}
-               {canAccess('sales_entry') && (
-                 <button onClick={() => { setView('sales_entry'); setIsMobileMenuOpen(false); }} className="flex flex-col items-center p-4 bg-rose-50 rounded-2xl text-rose-700">
-                    <ShoppingCart size={32} className="mb-2" />
-                    <span className="text-sm font-bold">New Order</span>
-                 </button>
-               )}
-
                <div className="col-span-2 mt-4 mb-2">
                  <p className="text-xs font-bold text-gray-400 uppercase tracking-widest px-1">Production & Logistics</p>
                </div>
                
+               {canAccess('raw_material') && (
+                 <button onClick={() => { setView('raw_material'); setIsMobileMenuOpen(false); }} className="flex flex-col items-center p-4 bg-slate-50 rounded-2xl text-slate-700">
+                    <Layers size={32} className="mb-2" />
+                    <span className="text-sm font-bold">Raw Material</span>
+                 </button>
+               )}
                {canAccess('ledger_sheet') && (
                  <button onClick={() => { setView('ledger_sheet'); setIsMobileMenuOpen(false); }} className="flex flex-col items-center p-4 bg-indigo-50 rounded-2xl text-indigo-700">
                     <FileText size={32} className="mb-2" />

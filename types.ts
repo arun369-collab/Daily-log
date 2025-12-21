@@ -91,10 +91,10 @@ export interface StockTransaction {
   itemId: string;
   date: string;
   qty: number;
-  type: 'INWARD' | 'ADJUSTMENT';
+  type: 'INWARD' | 'ADJUSTMENT' | 'ISSUE';
   notes?: string;
 }
 
-export type ViewState = 'dashboard' | 'entry' | 'history' | 'batches' | 'dispatch' | 'settings' | 'ledger_sheet' | 'sales_entry' | 'sales_dashboard' | 'customers' | 'packing_stock' | 'analytics' | 'finished_goods' | 'customer_behaviour' | 'planning';
+export type ViewState = 'dashboard' | 'entry' | 'history' | 'batches' | 'dispatch' | 'settings' | 'ledger_sheet' | 'sales_entry' | 'sales_dashboard' | 'customers' | 'packing_stock' | 'analytics' | 'finished_goods' | 'customer_behaviour' | 'planning' | 'raw_material';
 
 export type UserRole = 'admin' | 'yadav' | 'sales';
