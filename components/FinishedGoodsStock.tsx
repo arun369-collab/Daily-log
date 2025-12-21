@@ -133,7 +133,7 @@ export const FinishedGoodsStock: React.FC<FinishedGoodsStockProps> = ({ records 
 
       const manualDispatchBreakdown: FGDetail[] = records
         .filter(r => normalize(r.productName) === normName && normalize(r.size) === normSize && r.isDispatch && r.date === selectedDate)
-        .map(r => ({ date: r.date, reference: r.batchNo, qty: r.weightKg, info: r.notes }));
+        .map(r => ({ date: r.date, reference: r.batchNo || 'Manual', qty: r.weightKg, info: r.notes }));
 
       const orderDispatchBreakdown: FGDetail[] = [];
       orders
@@ -144,7 +144,7 @@ export const FinishedGoodsStock: React.FC<FinishedGoodsStockProps> = ({ records 
              .forEach(i => {
                orderDispatchBreakdown.push({
                  date: order.orderDate,
-                 reference: order.poNumber,
+                 reference: order.poNumber || 'No PO',
                  qty: i.calculatedWeightKg,
                  info: order.customerName
                });
@@ -338,32 +338,48 @@ export const FinishedGoodsStock: React.FC<FinishedGoodsStockProps> = ({ records 
         </div>
       </div>
 
-      {/* FLOAT BREAKDOWN TOOLTIP */}
+      {/* FLOAT BREAKDOWN TOOLTIP - UPDATED FOR SCREEN FIT AND DESPATCH DETAILS */}
       {hoveredBreakdown && (
         <div 
-          className="fixed z-[100] bg-white border border-gray-200 shadow-2xl rounded-lg overflow-hidden animate-fadeIn min-w-[200px]"
-          style={{ left: hoveredBreakdown.x + 10, top: hoveredBreakdown.y }}
+          className="fixed z-[100] bg-white border border-gray-300 shadow-2xl rounded-xl overflow-hidden animate-fadeIn min-w-[280px] max-w-[320px]"
+          style={{ 
+            left: (hoveredBreakdown.x + 300 > window.innerWidth) 
+              ? hoveredBreakdown.x - 310 
+              : hoveredBreakdown.x + 10, 
+            top: hoveredBreakdown.y 
+          }}
         >
-          <div className={`px-3 py-1 text-[10px] font-black uppercase text-white ${
+          <div className={`px-4 py-2 text-[11px] font-black uppercase text-white flex justify-between items-center ${
             hoveredBreakdown.type === 'PRODUCTION' ? 'bg-blue-600' :
             hoveredBreakdown.type === 'RETURN' ? 'bg-orange-600' : 'bg-red-600'
           }`}>
-            {hoveredBreakdown.type} Breakdown
+            <span>{hoveredBreakdown.type} Breakdown</span>
+            <span className="opacity-70 text-[9px] font-normal">{hoveredBreakdown.data.length} Entry(s)</span>
           </div>
-          <div className="p-2 space-y-1">
+          <div className="p-3 space-y-2 max-h-[300px] overflow-y-auto">
              {hoveredBreakdown.data.map((b, i) => (
-               <div key={i} className="flex justify-between items-center text-[11px] border-b border-gray-50 last:border-0 pb-1">
-                  <div>
-                    <span className="font-bold text-gray-700">{b.reference}</span>
-                    {b.info && <span className="block text-[9px] text-gray-400 truncate w-32">{b.info}</span>}
+               <div key={i} className="flex justify-between items-start text-[11px] border-b border-gray-100 last:border-0 pb-2">
+                  <div className="flex-1 pr-4">
+                    <span className="font-bold text-gray-900 block leading-tight">
+                      {hoveredBreakdown.type === 'DESPATCH' ? (b.info || 'Manual Transfer') : b.reference}
+                    </span>
+                    <span className="text-[9px] text-gray-500 font-mono mt-0.5 block uppercase">
+                      {hoveredBreakdown.type === 'DESPATCH' ? `PO Ref: ${b.reference}` : (b.info || 'Daily Production')}
+                    </span>
                   </div>
-                  <span className={`font-mono font-bold ${
-                    hoveredBreakdown.type === 'DESPATCH' ? 'text-red-600' : 'text-green-600'
+                  <span className={`font-mono font-black text-xs whitespace-nowrap ${
+                    hoveredBreakdown.type === 'DESPATCH' ? 'text-red-600' : 'text-green-700'
                   }`}>
-                    {hoveredBreakdown.type === 'DESPATCH' ? '-' : '+'}{b.qty.toLocaleString()}
+                    {hoveredBreakdown.type === 'DESPATCH' ? '-' : '+'}{b.qty.toLocaleString()} <span className="text-[9px] font-normal opacity-60">kg</span>
                   </span>
                </div>
              ))}
+          </div>
+          <div className="bg-gray-50 px-4 py-1.5 border-t border-gray-100 flex justify-between items-center text-[10px] font-bold text-gray-500 uppercase tracking-tighter">
+             <span>Sub-Total:</span>
+             <span className={hoveredBreakdown.type === 'DESPATCH' ? 'text-red-600' : 'text-green-700'}>
+               {hoveredBreakdown.data.reduce((sum, item) => sum + item.qty, 0).toLocaleString()} kg
+             </span>
           </div>
         </div>
       )}
